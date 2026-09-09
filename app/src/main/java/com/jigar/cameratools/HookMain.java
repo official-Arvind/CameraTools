@@ -434,36 +434,134 @@ public class HookMain implements IXposedHookLoadPackage {
                 Class<?> dataItemFeature = XposedHelpers.findClass("o000Oo0.OooO00o", lpparam.classLoader);
                 XposedBridge.hookAllMethods(dataItemFeature, "o00o0ooo", trueHook);
                 XposedBridge.log("[" + TAG + "] DataItemFeature.o00o0ooo() hooked -> true");
+
+                // 2b. o000ooo() -> Camera opening order: MUST return true so MAIN_SOURCE (Back Camera 0)
+                // opens FIRST as master before SUB_SOURCE (Front Camera 1)
+                XposedBridge.hookAllMethods(dataItemFeature, "o000ooo", trueHook);
+                XposedBridge.log("[" + TAG + "] DataItemFeature.o000ooo() hooked -> true (Back Camera 0 opens first)");
             } catch (Throwable t) {
-                XposedBridge.log("[" + TAG + "] Hook DataItemFeature.o00o0ooo failed: " + t.getMessage());
+                XposedBridge.log("[" + TAG + "] Hook DataItemFeature failed: " + t.getMessage());
             }
 
-            // 3. Common.o00Oo0oO() -> Device config method for dual cam support
+            // 3. Common.o00Oo0oO() and Common.o000ooo() -> Device config methods
             try {
                 Class<?> commonClass = XposedHelpers.findClass("com.mi.device.Common", lpparam.classLoader);
                 XposedBridge.hookAllMethods(commonClass, "o00Oo0oO", trueHook);
-                XposedBridge.log("[" + TAG + "] Common.o00Oo0oO() hooked -> true");
+                XposedBridge.hookAllMethods(commonClass, "o000ooo", trueHook);
+                XposedBridge.log("[" + TAG + "] Common.o00Oo0oO() and o000ooo() hooked -> true");
             } catch (Throwable t) {
-                XposedBridge.log("[" + TAG + "] Hook Common.o00Oo0oO failed: " + t.getMessage());
+                XposedBridge.log("[" + TAG + "] Hook Common dual methods failed: " + t.getMessage());
             }
 
-            // 4. Ruby.o00Oo0oO() in case overridden in device class
+            // 4. Ruby.o00Oo0oO() and Ruby.o000ooo()
             try {
                 Class<?> rubyClass = XposedHelpers.findClass("com.mi.device.Ruby", lpparam.classLoader);
                 XposedBridge.hookAllMethods(rubyClass, "o00Oo0oO", trueHook);
-                XposedBridge.log("[" + TAG + "] Ruby.o00Oo0oO() hooked -> true");
+                XposedBridge.hookAllMethods(rubyClass, "o000ooo", trueHook);
+                XposedBridge.log("[" + TAG + "] Ruby.o00Oo0oO() and o000ooo() hooked -> true");
             } catch (Throwable ignored) {}
 
-            // 5. CameraCapabilitiesUtil.isDualVideoKeepCapture
+            // 5. MediaTek MTK PIP Tag Enablement: o000Oo0.OooO0O0.OooOOoo()
+            // Enables setMtkPipDevices on MediaTek HAL so the hardware pipeline allows concurrent front+back streams
+            try {
+                Class<?> dataItemFeature2 = XposedHelpers.findClass("o000Oo0.OooO0O0", lpparam.classLoader);
+                XposedBridge.hookAllMethods(dataItemFeature2, "OooOOoo", trueHook);
+                XposedBridge.log("[" + TAG + "] DataItemFeature2.OooOOoo() hooked -> true (MediaTek PIP feature tag enabled)");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook DataItemFeature2.OooOOoo failed: " + t.getMessage());
+            }
+
+            // 6. CameraCapabilitiesUtil capabilities
             try {
                 Class<?> utilClass = XposedHelpers.findClass("com.android.camera2.CameraCapabilitiesUtil", lpparam.classLoader);
                 XposedBridge.hookAllMethods(utilClass, "isDualVideoKeepCapture", trueHook);
-                XposedBridge.log("[" + TAG + "] CameraCapabilitiesUtil.isDualVideoKeepCapture hooked -> true");
+                XposedBridge.hookAllMethods(utilClass, "isSatPipSupported", trueHook);
+                XposedBridge.log("[" + TAG + "] CameraCapabilitiesUtil DualVideo capabilities hooked");
             } catch (Throwable t) {
-                XposedBridge.log("[" + TAG + "] Hook CameraCapabilitiesUtil.isDualVideoKeepCapture failed: " + t.getMessage());
+                XposedBridge.log("[" + TAG + "] Hook CameraCapabilitiesUtil failed: " + t.getMessage());
             }
 
-            // 6. Guarantee Mode 204 (Dual Video) in DataItemGlobal.getSortModes() so it appears in More / Modes
+            try {
+                Class<?> capsClass = XposedHelpers.findClass("com.android.camera2.CameraCapabilities", lpparam.classLoader);
+                XposedBridge.hookAllMethods(capsClass, "isDualVideoKeepCapture", trueHook);
+                XposedBridge.hookAllMethods(capsClass, "isSatPipSupported", trueHook);
+                XposedBridge.log("[" + TAG + "] CameraCapabilities DualVideo capabilities hooked");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook CameraCapabilities failed: " + t.getMessage());
+            }
+
+            // 7. Fix Session Operating Mode on MediaTek:
+            // DualCamModuleDevice.getOperatingMode() and DualVideoModuleBase.getOperatingMode()
+            // return proprietary Qualcomm modes 32772 (0x8004) / 32777 (0x8009) which crash MTK Camera HAL.
+            // On MediaTek Dimensity 1080 (ruby), returning 0 (SESSION_REGULAR) creates standard Camera2 dual sessions.
+            XC_MethodHook normalOperatingModeHook = new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                    if (!enableDualVideo) return;
+                    param.setResult(0); // Standard Android SESSION_REGULAR
+                }
+            };
+
+            try {
+                Class<?> dualCamDevice = XposedHelpers.findClass("com.android.camera.features.mode.dualcam.DualCamModuleDevice", lpparam.classLoader);
+                XposedBridge.hookAllMethods(dualCamDevice, "getOperatingMode", normalOperatingModeHook);
+                XposedBridge.log("[" + TAG + "] DualCamModuleDevice.getOperatingMode() hooked -> 0 (SESSION_REGULAR)");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook DualCamModuleDevice.getOperatingMode failed: " + t.getMessage());
+            }
+
+            try {
+                Class<?> dualVideoBase = XposedHelpers.findClass("com.android.camera.dualvideo.DualVideoModuleBase", lpparam.classLoader);
+                XposedBridge.hookAllMethods(dualVideoBase, "getOperatingMode", normalOperatingModeHook);
+                XposedBridge.log("[" + TAG + "] DualVideoModuleBase.getOperatingMode() hooked -> 0 (SESSION_REGULAR)");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook DualVideoModuleBase.getOperatingMode failed: " + t.getMessage());
+            }
+
+            // 8. Sanitize CompatibilityUtils.createCaptureSessionWithSessionConfiguration:
+            // If sessionType is >= 32768 (Qualcomm vendor modes 0x8004, 0x8009, 0x8010), rewrite to 0 (SESSION_REGULAR)
+            try {
+                Class<?> compatUtils = XposedHelpers.findClass("com.android.camera.lib.compatibility.util.CompatibilityUtils", lpparam.classLoader);
+                XposedBridge.hookAllMethods(compatUtils, "createCaptureSessionWithSessionConfiguration", new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        if (!enableDualVideo) return;
+                        if (param.args.length > 1 && param.args[1] instanceof Integer) {
+                            int sessionType = (Integer) param.args[1];
+                            if (sessionType >= 32768) {
+                                XposedBridge.log("[" + TAG + "] Sanitized vendor sessionType 0x" + Integer.toHexString(sessionType) + " -> 0 (SESSION_REGULAR)");
+                                param.args[1] = 0;
+                            }
+                        }
+                    }
+                });
+                XposedBridge.log("[" + TAG + "] CompatibilityUtils.createCaptureSessionWithSessionConfiguration sessionType sanitizer hooked");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook CompatibilityUtils failed: " + t.getMessage());
+            }
+
+            // 9. Protect Camera 0 and Camera 1 from mutual closure during Dual Video switching
+            try {
+                Class<?> closeCallableClass = XposedHelpers.findClass("com.xiaomi.camera.device.callable.CloseCameraCallable", lpparam.classLoader);
+                XposedBridge.hookAllConstructors(closeCallableClass, new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        if (!enableDualVideo) return;
+                        if (param.args.length >= 3 && param.args[2] instanceof String[]) {
+                            String[] cur = (String[]) param.args[2];
+                            java.util.HashSet<String> set = new java.util.HashSet<>(java.util.Arrays.asList(cur));
+                            set.add("0");
+                            set.add("1");
+                            param.args[2] = set.toArray(new String[0]);
+                        }
+                    }
+                });
+                XposedBridge.log("[" + TAG + "] CloseCameraCallable dual camera mutual protection hooked");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook CloseCameraCallable failed: " + t.getMessage());
+            }
+
+            // 10. Guarantee Mode 204 (Dual Video) in DataItemGlobal.getSortModes() so it appears in More / Modes
             try {
                 Class<?> globalClass = XposedHelpers.findClass("com.android.camera.data.data.global.DataItemGlobal", lpparam.classLoader);
                 XposedBridge.hookAllMethods(globalClass, "getSortModes", new XC_MethodHook() {
@@ -617,37 +715,38 @@ public class HookMain implements IXposedHookLoadPackage {
                 });
             } catch (Throwable ignored) {}
 
-            // D. Hook ActivityHandler message 3 (shows CameraExitHintDialogFragment 3-second countdown & exit)
+            // D. Hook ActivityHandler message 3 (thermal exit) and message 10 (camera error exit)
             try {
                 Class<?> handlerClass = XposedHelpers.findClass("com.android.camera.ActivityBase$ActivityHandler", lpparam.classLoader);
                 XposedBridge.hookAllMethods(handlerClass, "handleMessage", new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        if (!enableDisableThermal) return;
                         if (param.args.length > 0 && param.args[0] instanceof android.os.Message) {
                             android.os.Message msg = (android.os.Message) param.args[0];
-                            if (msg.what == 3) {
+                            if (msg.what == 3 && enableDisableThermal) {
                                 // Suppress thermal exit dialog
+                                param.setResult(null);
+                            } else if (msg.what == 10 && enableDualVideo) {
+                                // Suppress "Can't connect to the camera" fatal error dialog
+                                XposedBridge.log("[" + TAG + "] ActivityHandler camera error msg 10 intercepted (arg1=" + msg.arg1 + "), suppressing forced shutdown dialog");
                                 param.setResult(null);
                             }
                         }
                     }
                 });
-                XposedBridge.log("[" + TAG + "] ActivityHandler message 3 exit suppression installed");
+                XposedBridge.log("[" + TAG + "] ActivityHandler message 3 and message 10 exit suppression installed");
             } catch (Throwable t) {
                 XposedBridge.log("[" + TAG + "] Hook ActivityHandler failed: " + t.getMessage());
             }
 
-            // E. Hook CameraExitHintDialogFragment (prevent errorType 3 from showing dialog)
+            // E. Hook CameraExitHintDialogFragment (prevent countdown from ever closing the camera app)
             try {
                 Class<?> exitDialogClass = XposedHelpers.findClass("com.android.camera.fragment.dialog.CameraExitHintDialogFragment", lpparam.classLoader);
-                XposedBridge.hookAllMethods(exitDialogClass, "setErrorType", new XC_MethodHook() {
+                XposedBridge.hookAllMethods(exitDialogClass, "onTimerFinish", new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        if (!enableDisableThermal) return;
-                        if (param.args.length > 0 && Integer.valueOf(3).equals(param.args[0])) {
-                            param.setResult(null);
-                        }
+                        XposedBridge.log("[" + TAG + "] CameraExitHintDialogFragment.onTimerFinish() suppressed - camera app will stay open");
+                        param.setResult(null);
                     }
                 });
             } catch (Throwable ignored) {}
