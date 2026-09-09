@@ -408,7 +408,7 @@ public class HookMain implements IXposedHookLoadPackage {
     }
 
     // ==========================================
-    // 5. Dual-Camera Concurrent Stream (Director Mode)
+    // 5. Dual-Camera Concurrent Stream (Director Mode / Dual Video)
     // ==========================================
     private void hookDualVideo(final XC_LoadPackage.LoadPackageParam lpparam) {
         try {
@@ -420,20 +420,81 @@ public class HookMain implements IXposedHookLoadPackage {
                 }
             };
 
+            // 1. DualCamModuleEntry.support() -> MUST return true for FeatureLoader to register mode 204
+            try {
+                Class<?> dualEntryClass = XposedHelpers.findClass("com.android.camera.features.mode.dualcam.DualCamModuleEntry", lpparam.classLoader);
+                XposedBridge.hookAllMethods(dualEntryClass, "support", trueHook);
+                XposedBridge.log("[" + TAG + "] DualCamModuleEntry.support() hooked -> true");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook DualCamModuleEntry.support failed: " + t.getMessage());
+            }
+
+            // 2. DataItemFeature.o00o0ooo() -> The underlying DEX method DualCamModuleEntry calls
             try {
                 Class<?> dataItemFeature = XposedHelpers.findClass("o000Oo0.OooO00o", lpparam.classLoader);
-                XposedBridge.hookAllMethods(dataItemFeature, "isSupportDualVideo", trueHook);
-                XposedBridge.hookAllMethods(dataItemFeature, "isSupportDualVideoCameraChoose", trueHook);
-                XposedBridge.hookAllMethods(dataItemFeature, "isSupportDualVideoOpMode", trueHook);
+                XposedBridge.hookAllMethods(dataItemFeature, "o00o0ooo", trueHook);
+                XposedBridge.log("[" + TAG + "] DataItemFeature.o00o0ooo() hooked -> true");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook DataItemFeature.o00o0ooo failed: " + t.getMessage());
+            }
+
+            // 3. Common.o00Oo0oO() -> Device config method for dual cam support
+            try {
+                Class<?> commonClass = XposedHelpers.findClass("com.mi.device.Common", lpparam.classLoader);
+                XposedBridge.hookAllMethods(commonClass, "o00Oo0oO", trueHook);
+                XposedBridge.log("[" + TAG + "] Common.o00Oo0oO() hooked -> true");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook Common.o00Oo0oO failed: " + t.getMessage());
+            }
+
+            // 4. Ruby.o00Oo0oO() in case overridden in device class
+            try {
+                Class<?> rubyClass = XposedHelpers.findClass("com.mi.device.Ruby", lpparam.classLoader);
+                XposedBridge.hookAllMethods(rubyClass, "o00Oo0oO", trueHook);
+                XposedBridge.log("[" + TAG + "] Ruby.o00Oo0oO() hooked -> true");
             } catch (Throwable ignored) {}
 
+            // 5. CameraCapabilitiesUtil.isDualVideoKeepCapture
             try {
                 Class<?> utilClass = XposedHelpers.findClass("com.android.camera2.CameraCapabilitiesUtil", lpparam.classLoader);
-                XposedBridge.hookAllMethods(utilClass, "isSupportDualVideo", trueHook);
-                XposedBridge.hookAllMethods(utilClass, "isSupportDualVideoCameraChoose", trueHook);
-            } catch (Throwable ignored) {}
+                XposedBridge.hookAllMethods(utilClass, "isDualVideoKeepCapture", trueHook);
+                XposedBridge.log("[" + TAG + "] CameraCapabilitiesUtil.isDualVideoKeepCapture hooked -> true");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook CameraCapabilitiesUtil.isDualVideoKeepCapture failed: " + t.getMessage());
+            }
 
-            XposedBridge.log("[" + TAG + "] Dual-Camera Concurrent Stream hooked");
+            // 6. Guarantee Mode 204 (Dual Video) in DataItemGlobal.getSortModes() so it appears in More / Modes
+            try {
+                Class<?> globalClass = XposedHelpers.findClass("com.android.camera.data.data.global.DataItemGlobal", lpparam.classLoader);
+                XposedBridge.hookAllMethods(globalClass, "getSortModes", new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        if (!enableDualVideo) return;
+                        Object res = param.getResult();
+                        if (res instanceof int[]) {
+                            int[] modes = (int[]) res;
+                            boolean hasDualVideo = false;
+                            for (int m : modes) {
+                                if (m == 204) {
+                                    hasDualVideo = true;
+                                    break;
+                                }
+                            }
+                            if (!hasDualVideo) {
+                                int[] newModes = new int[modes.length + 1];
+                                System.arraycopy(modes, 0, newModes, 0, modes.length);
+                                newModes[modes.length] = 204;
+                                param.setResult(newModes);
+                            }
+                        }
+                    }
+                });
+                XposedBridge.log("[" + TAG + "] DataItemGlobal.getSortModes() hooked to ensure mode 204 included");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook DataItemGlobal.getSortModes failed: " + t.getMessage());
+            }
+
+            XposedBridge.log("[" + TAG + "] Dual-Camera Concurrent Stream (Mode 204) hooked successfully");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook Dual Video failed: " + t.getMessage());
         }
