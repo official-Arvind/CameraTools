@@ -1,0 +1,31 @@
+﻿plugins {
+    id("com.android.application")
+}
+
+android {
+    namespace = "com.jigar.cameratools"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.jigar.cameratools"
+        minSdk = 29
+        targetSdk = 34
+        versionCode = 100
+        versionName = "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    compileOnly("de.robv.android.xposed:api:82")
+}

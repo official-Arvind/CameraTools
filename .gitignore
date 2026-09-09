@@ -1,0 +1,36 @@
+# Gradle and build artifacts
+.gradle/
+build/
+app/build/
+build_tmp/
+*.iml
+.idea/
+.cxx/
+.externalNativeBuild/
+captures/
+bin/
+
+# Sensitive key & signature files (STRICTLY PROHIBITED FROM REPO)
+*.jks
+*.keystore
+*.key
+*.pem
+*.p12
+*.bks
+keystore.properties
+local.properties
+secrets.properties
+
+# Android ID signatures
+*.idsig
+
+# APKs and zips outside release directory
+*.apk
+!release/*.apk
+*.zip
+!release/*.zip
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+Desktop.ini
