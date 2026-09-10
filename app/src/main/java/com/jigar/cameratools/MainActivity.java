@@ -55,21 +55,40 @@ public class MainActivity extends Activity {
         loadPreferences();
         setupListeners();
 
-        Button btnRestart = findViewById(R.id.btn_restart);
+        final Button btnRestart = findViewById(R.id.btn_restart);
         btnRestart.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                restartCamera();
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                btnRestart.setEnabled(false);
+                btnRestart.setText("Restarting...");
+                restartCamera(btnRestart);
             }
         });
 
-        Button btnEnableAll = findViewById(R.id.btn_enable_all);
+        final Button btnEnableAll = findViewById(R.id.btn_enable_all);
+        updateToggleAllButtonText(btnEnableAll);
         btnEnableAll.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setAll(true);
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+                boolean allActive = areAllEnabled();
+                setAll(!allActive);
+                updateToggleAllButtonText(btnEnableAll);
             }
         });
+    }
+
+    private boolean areAllEnabled() {
+        return sw4k60.isChecked() && swBitrate.isChecked() && swRaw.isChecked()
+                && swLeica.isChecked() && swDualVideo.isChecked() && swShutter.isChecked()
+                && swThermal.isChecked();
+    }
+
+    private void updateToggleAllButtonText(Button btn) {
+        if (btn != null) {
+            btn.setText(areAllEnabled() ? "Disable All" : "Enable All");
+        }
     }
 
     private void loadPreferences() {
@@ -83,7 +102,8 @@ public class MainActivity extends Activity {
     }
 
     private void setupListeners() {
-        CompoundButtonListener listener = new CompoundButtonListener();
+        final Button btnEnableAll = findViewById(R.id.btn_enable_all);
+        CompoundButtonListener listener = new CompoundButtonListener(btnEnableAll);
         sw4k60.setOnCheckedChangeListener(listener);
         swBitrate.setOnCheckedChangeListener(listener);
         swRaw.setOnCheckedChangeListener(listener);
@@ -94,8 +114,15 @@ public class MainActivity extends Activity {
     }
 
     private class CompoundButtonListener implements android.widget.CompoundButton.OnCheckedChangeListener {
+        private final Button btnToggle;
+
+        public CompoundButtonListener(Button btnToggle) {
+            this.btnToggle = btnToggle;
+        }
+
         @Override
         public void onCheckedChanged(android.widget.CompoundButton buttonView, boolean isChecked) {
+            buttonView.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
             SharedPreferences.Editor ed = prefs.edit();
             int id = buttonView.getId();
             if (id == R.id.switch_4k60) ed.putBoolean(PrefProvider.KEY_4K60, isChecked);
@@ -107,6 +134,7 @@ public class MainActivity extends Activity {
             else if (id == R.id.switch_thermal) ed.putBoolean(PrefProvider.KEY_DISABLE_THERMAL, isChecked);
             ed.commit();
             makePrefsWorldReadable();
+            updateToggleAllButtonText(btnToggle);
         }
     }
 
@@ -122,7 +150,8 @@ public class MainActivity extends Activity {
                 prefsFile.setReadable(true, false);
             }
             // Root chmod ensures reading across LSPosed / Vector context
-            Runtime.getRuntime().exec(new String[]{"su", "-c", "chmod 777 /data/data/com.jigar.cameratools/shared_prefs; chmod 666 /data/data/com.jigar.cameratools/shared_prefs/*"});
+            String pkg = getPackageName();
+            Runtime.getRuntime().exec(new String[]{"su", "-c", "chmod 777 /data/data/" + pkg + "/shared_prefs; chmod 666 /data/data/" + pkg + "/shared_prefs/*"});
         } catch (Throwable ignored) {}
     }
 
@@ -144,10 +173,10 @@ public class MainActivity extends Activity {
             .putBoolean(PrefProvider.KEY_DISABLE_THERMAL, state)
             .commit();
         makePrefsWorldReadable();
-        Toast.makeText(this, "All features " + (state ? "enabled" : "disabled"), Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, state ? "All features activated" : "All features deactivated", Toast.LENGTH_SHORT).show();
     }
 
-    private void restartCamera() {
+    private void restartCamera(final Button btnRestart) {
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -159,9 +188,14 @@ public class MainActivity extends Activity {
                         Runtime.getRuntime().exec("am force-stop com.android.camera");
                     } catch (Exception ignored) {}
                 }
+                try { Thread.sleep(600); } catch (InterruptedException ignored) {}
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        if (btnRestart != null) {
+                            btnRestart.setEnabled(true);
+                            btnRestart.setText(R.string.btn_restart_camera);
+                        }
                         Toast.makeText(MainActivity.this, "Camera restarted!", Toast.LENGTH_SHORT).show();
                     }
                 });

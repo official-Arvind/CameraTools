@@ -67,7 +67,7 @@ public class HookMain implements IXposedHookLoadPackage {
 
     private void loadPreferences() {
         try {
-            xsp = new XSharedPreferences("com.jigar.cameratools", PrefProvider.PREFS_NAME);
+            xsp = new XSharedPreferences("io.github.official_arvind.cameratools", PrefProvider.PREFS_NAME);
             xsp.makeWorldReadable();
             xsp.reload();
             enable4k60 = xsp.getBoolean(PrefProvider.KEY_4K60, true);

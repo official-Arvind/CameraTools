@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.jigar.cameratools"
+    package="io.github.official_arvind.cameratools"
     android:versionCode="101"
     android:versionName="1.1.0">
 
@@ -36,7 +36,7 @@
 
         <provider
             android:name=".PrefProvider"
-            android:authorities="com.jigar.cameratools.prefs"
+            android:authorities="io.github.official_arvind.cameratools.prefs"
             android:exported="true"
             android:grantUriPermissions="true" />
 

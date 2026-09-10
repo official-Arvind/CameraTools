@@ -9,7 +9,7 @@ import android.net.Uri;
 import android.os.Bundle;
 
 public class PrefProvider extends ContentProvider {
-    public static final String AUTHORITY = "com.jigar.cameratools.prefs";
+    public static final String AUTHORITY = "io.github.official_arvind.cameratools.prefs";
     public static final String PREFS_NAME = "camera_tools_prefs";
 
     public static final String KEY_4K60 = "pref_4k60";
@@ -56,7 +56,7 @@ public class PrefProvider extends ContentProvider {
 
     @Override
     public String getType(Uri uri) {
-        return "vnd.android.cursor.dir/vnd.com.jigar.cameratools.pref";
+        return "vnd.android.cursor.dir/vnd.io.github.official_arvind.cameratools.pref";
     }
 
     @Override

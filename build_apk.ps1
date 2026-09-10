@@ -30,6 +30,8 @@ $flatFiles = Get-ChildItem "$buildDir\compiled_res\*.flat" | ForEach-Object { $_
     -I $androidJar `
     --manifest "app\src\main\AndroidManifest.xml" `
     --java "$buildDir\gen" `
+    --custom-package "com.jigar.cameratools" `
+    --extra-packages "io.github.official_arvind.cameratools" `
     --version-code 101 `
     --version-name "1.1.0" `
     -o "$buildDir\unaligned.apk" `
@@ -45,7 +47,9 @@ $javaFiles = @(
 javac -cp "$androidJar" -d "$buildDir\classes" -source 1.8 -target 1.8 $javaFiles
 
 Write-Host "[4/6] Isolating module classes (excluding Xposed API stubs)..."
-Copy-Item -Recurse "$buildDir\classes\com" "$buildDir\classes_mod\"
+Get-ChildItem "$buildDir\classes" -Directory | Where-Object { $_.Name -ne "de" } | ForEach-Object {
+    Copy-Item -Recurse $_.FullName "$buildDir\classes_mod\"
+}
 
 Write-Host "[5/6] Converting to Dalvik Executable (DEX) with D8 (v36)..."
 $classFiles = Get-ChildItem -Recurse "$buildDir\classes_mod\*.class" | ForEach-Object { $_.FullName }
@@ -64,8 +68,10 @@ print('Injected classes.dex and assets/xposed_init successfully')
 "
 
 Write-Host "[7/7] Aligning & Signing with Arvind's release keystore..."
-$outApk = "release\com.jigar.cameratools-v1.1.0.apk"
+$outApk = "release\io.github.official_arvind.cameratools-v1.1.0.apk"
+$legacyApk = "release\com.jigar.cameratools-v1.1.0.apk"
 if (Test-Path $outApk) { Remove-Item -Force $outApk }
+if (Test-Path $legacyApk) { Remove-Item -Force $legacyApk }
 & $zipalign -p -f 4 "$buildDir\unaligned.apk" $outApk
 
 & $apksigner sign `
@@ -80,5 +86,6 @@ if (Test-Path $outApk) { Remove-Item -Force $outApk }
 
 & $apksigner verify --verbose $outApk
 
+Copy-Item $outApk $legacyApk -Force
 Remove-Item -Recurse -Force $buildDir
 Write-Host "SUCCESS! Signed release APK generated at: $outApk"

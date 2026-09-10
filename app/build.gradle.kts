@@ -7,7 +7,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.jigar.cameratools"
+        applicationId = "io.github.official_arvind.cameratools"
         minSdk = 29
         targetSdk = 34
         versionCode = 101
