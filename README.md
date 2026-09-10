@@ -1,8 +1,8 @@
-﻿# CameraTools (com.jigar.cameratools)
+# CameraTools (com.jigar.cameratools)
 
-[![GitHub Release](https://img.shields.io/badge/release-v1.0.0-blue.svg)](https://github.com/official-Arvind/com.jigar.cameratools/releases)
-[![Target](https://img.shields.io/badge/device-Redmi%20Note%2012%20Pro%205G%20(ruby)-green.svg)](https://github.com/official-Arvind/com.jigar.cameratools)
-[![Platform](https://img.shields.io/badge/framework-LSPosed%20%7C%20Vector%20Framework-purple.svg)](https://github.com/official-Arvind/com.jigar.cameratools)
+[![GitHub Release](https://img.shields.io/badge/release-v1.1.0-blue.svg)](https://github.com/official-Arvind/CameraTools/releases)
+[![Target](https://img.shields.io/badge/device-Redmi%20Note%2012%20Pro%205G%20(ruby)-green.svg)](https://github.com/official-Arvind/CameraTools)
+[![Platform](https://img.shields.io/badge/framework-LSPosed%20%7C%20Vector%20Framework-purple.svg)](https://github.com/official-Arvind/CameraTools)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **CameraTools** (`com.jigar.cameratools`) is an all-in-one Camera & ISP Subsystem enhancement module and configuration manager engineered specifically for the **Xiaomi Redmi Note 12 Pro 5G** (`ruby`, MediaTek Dimensity 1080 / MT6877, Sony IMX766 50MP OIS sensor).
