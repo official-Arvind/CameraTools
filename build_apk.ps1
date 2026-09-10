@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $sdkTools34 = "C:\Users\Arvind\AppData\Local\Android\Sdk\build-tools\34.0.0"
 $sdkTools36 = "C:\Users\Arvind\AppData\Local\Android\Sdk\build-tools\36.0.0"
@@ -30,6 +30,8 @@ $flatFiles = Get-ChildItem "$buildDir\compiled_res\*.flat" | ForEach-Object { $_
     -I $androidJar `
     --manifest "app\src\main\AndroidManifest.xml" `
     --java "$buildDir\gen" `
+    --version-code 101 `
+    --version-name "1.1.0" `
     -o "$buildDir\unaligned.apk" `
     $flatFiles
 
@@ -62,7 +64,7 @@ print('Injected classes.dex and assets/xposed_init successfully')
 "
 
 Write-Host "[7/7] Aligning & Signing with Arvind's release keystore..."
-$outApk = "release\com.jigar.cameratools-v1.0.0.apk"
+$outApk = "release\com.jigar.cameratools-v1.1.0.apk"
 if (Test-Path $outApk) { Remove-Item -Force $outApk }
 & $zipalign -p -f 4 "$buildDir\unaligned.apk" $outApk
 

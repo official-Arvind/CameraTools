@@ -592,6 +592,90 @@ public class HookMain implements IXposedHookLoadPackage {
                 XposedBridge.log("[" + TAG + "] Hook DataItemGlobal.getSortModes failed: " + t.getMessage());
             }
 
+
+            // Hook concurrent stream support methods
+            try {
+                Class<?> utilClass = XposedHelpers.findClass("com.android.camera2.CameraCapabilitiesUtil", lpparam.classLoader);
+                try { XposedBridge.hookAllMethods(utilClass, "isConcurrentStreamSupported", trueHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(utilClass, "isConcurrentModeSupported", trueHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(utilClass, "isSupportDualVideo", trueHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(utilClass, "isSupportPIP", trueHook); } catch (Throwable ignored) {}
+                XposedBridge.log("[" + TAG + "] CameraCapabilitiesUtil concurrent/dualvideo/PIP hooks installed");
+            } catch (Throwable ignored) {}
+
+            try {
+                Class<?> capsClass = XposedHelpers.findClass("com.android.camera2.CameraCapabilities", lpparam.classLoader);
+                try { XposedBridge.hookAllMethods(capsClass, "isConcurrentStreamSupported", trueHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(capsClass, "isConcurrentModeSupported", trueHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(capsClass, "isSupportDualVideo", trueHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(capsClass, "isSupportPIP", trueHook); } catch (Throwable ignored) {}
+                XposedBridge.log("[" + TAG + "] CameraCapabilities concurrent/dualvideo/PIP hooks installed");
+            } catch (Throwable ignored) {}
+
+            // 11. Hook DualVideoModuleUtil for camera selection and layout support
+            try {
+                Class<?> dualVideoUtil = XposedHelpers.findClass("com.android.camera.dualvideo.DualVideoModuleUtil", lpparam.classLoader);
+                // Enable all dual video camera combinations
+                try { XposedBridge.hookAllMethods(dualVideoUtil, "isSupportDualVideoCameraChoose", trueHook); } catch (Throwable ignored) {}
+                XposedBridge.log("[" + TAG + "] DualVideoModuleUtil camera choose support hooked");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook DualVideoModuleUtil failed: " + t.getMessage());
+            }
+
+            // 12. Hook ComponentRunningDualVideo to ensure dual video data component is available
+            try {
+                Class<?> componentDualVideo = XposedHelpers.findClass("com.android.camera.data.data.runing.ComponentRunningDualVideo", lpparam.classLoader);
+                // Hook to ensure the component reports dual video is supported
+                XposedBridge.hookAllMethods(componentDualVideo, "isClosed", new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        if (!enableDualVideo) return;
+                        param.setResult(false);
+                    }
+                });
+                XposedBridge.log("[" + TAG + "] ComponentRunningDualVideo hooked");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook ComponentRunningDualVideo failed: " + t.getMessage());
+            }
+
+            // 13. Hook Checker class to bypass hardware capability checks for dual video
+            try {
+                Class<?> checkerClass = XposedHelpers.findClass("com.android.camera.dualvideo.Checker", lpparam.classLoader);
+                XC_MethodHook checkTrueHook = new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        if (!enableDualVideo) return;
+                        param.setResult(true);
+                    }
+                };
+                for (java.lang.reflect.Method m : checkerClass.getDeclaredMethods()) {
+                    if (m.getReturnType() == boolean.class || m.getReturnType() == Boolean.class) {
+                        try {
+                            XposedBridge.hookAllMethods(checkerClass, m.getName(), checkTrueHook);
+                        } catch (Throwable ignored) {}
+                    }
+                }
+                XposedBridge.log("[" + TAG + "] DualVideo Checker all boolean checks bypassed");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook Checker failed: " + t.getMessage());
+            }
+
+            // 14. Hook PIPInfo to enable PIP capability for MediaTek
+            try {
+                Class<?> pipInfoClass = XposedHelpers.findClass("com.android.camera.PIPInfo", lpparam.classLoader);
+                try { XposedBridge.hookAllMethods(pipInfoClass, "checkOpenAbility", new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        if (!enableDualVideo) return;
+                        param.setResult(0); // 0 = OK, can open
+                    }
+                }); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(pipInfoClass, "isSupportPIP", trueHook); } catch (Throwable ignored) {}
+                XposedBridge.log("[" + TAG + "] PIPInfo hooks installed");
+            } catch (Throwable t) {
+                XposedBridge.log("[" + TAG + "] Hook PIPInfo failed: " + t.getMessage());
+            }
+
             XposedBridge.log("[" + TAG + "] Dual-Camera Concurrent Stream (Mode 204) hooked successfully");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook Dual Video failed: " + t.getMessage());
