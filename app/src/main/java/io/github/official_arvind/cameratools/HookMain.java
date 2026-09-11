@@ -1,4 +1,4 @@
-package com.jigar.cameratools;
+package io.github.official_arvind.cameratools;
 
 import android.app.Application;
 import android.content.Context;
@@ -17,7 +17,7 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class HookMain implements IXposedHookLoadPackage {
-    private static final String TAG = "JigarCameraTools";
+    private static final String TAG = "CameraTools";
 
     // Feature toggles (defaulting to true)
     private boolean enable4k60 = true;

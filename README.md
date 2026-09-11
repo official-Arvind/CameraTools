@@ -32,7 +32,7 @@ The companion app provides interactive toggle cards for each individual feature,
 ```
 ┌────────────────────────────────────────────────────────┐
 │             CameraTools Settings UI                    │
-│           (com.jigar.cameratools)                      │
+│      (io.github.official_arvind.cameratools)           │
 ├────────────────────────────────────────────────────────┤
 │  ⚡ 4K 60FPS Video Recording          [ON/OFF]         │
 │  🎬 Cinematic Ultra Bitrate (150Mbps) [ON/OFF]         │

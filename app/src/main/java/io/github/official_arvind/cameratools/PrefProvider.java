@@ -1,4 +1,4 @@
-package com.jigar.cameratools;
+package io.github.official_arvind.cameratools;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;

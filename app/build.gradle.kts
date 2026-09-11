@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.jigar.cameratools"
+    namespace = "io.github.official_arvind.cameratools"
     compileSdk = 34
 
     defaultConfig {
