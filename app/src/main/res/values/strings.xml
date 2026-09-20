@@ -31,4 +31,6 @@
     <string name="btn_enable_all">Enable All</string>
     <string name="btn_reset_defaults">Reset</string>
     <string name="status_active">LSPosed Active - ruby MT6877</string>
+    <string name="title_about">About this module</string>
+    <string name="desc_about">Xiaomi software restricts many camera capabilities on mid-range devices. This module bypasses these artificial restrictions by directly hooking into the Xiaomi Camera application at runtime.\n\nEnabling the module allows you to cleanly toggle hidden features without modifying your system files. You can turn on each feature below, and a toast will confirm if the hook was successful when the Camera app opens.</string>
 </resources>

@@ -1,5 +1,7 @@
 <h1 align="center">
-  CameraTools
+  <picture>
+    <img src="assets/logo.svg" alt="CameraTools">
+  </picture>
 </h1>
 
 <p align="center">
