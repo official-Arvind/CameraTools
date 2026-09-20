@@ -21,13 +21,19 @@ public class MainActivity extends Activity {
     private Switch swDualVideo;
     private Switch swShutter;
     private Switch swThermal;
+    private Switch swHighResPhoto;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        prefs = getSharedPreferences(PrefProvider.PREFS_NAME, Context.MODE_PRIVATE);
+        Context deCtx = isDeviceProtectedStorage() ? this : createDeviceProtectedStorageContext();
+        try {
+            prefs = deCtx.getSharedPreferences(PrefProvider.PREFS_NAME, Context.MODE_WORLD_READABLE);
+        } catch (SecurityException e) {
+            prefs = deCtx.getSharedPreferences(PrefProvider.PREFS_NAME, Context.MODE_PRIVATE);
+        }
 
         sw4k60 = findViewById(R.id.switch_4k60);
         swBitrate = findViewById(R.id.switch_bitrate);
@@ -36,20 +42,22 @@ public class MainActivity extends Activity {
         swDualVideo = findViewById(R.id.switch_dual_video);
         swShutter = findViewById(R.id.switch_shutter);
         swThermal = findViewById(R.id.switch_thermal);
+        swHighResPhoto = findViewById(R.id.switch_high_res_photo);
 
         // Ensure defaults are saved if any key is missing
         SharedPreferences.Editor edInit = prefs.edit();
         boolean changed = false;
-        if (!prefs.contains(PrefProvider.KEY_4K60)) { edInit.putBoolean(PrefProvider.KEY_4K60, true); changed = true; }
-        if (!prefs.contains(PrefProvider.KEY_BITRATE)) { edInit.putBoolean(PrefProvider.KEY_BITRATE, true); changed = true; }
-        if (!prefs.contains(PrefProvider.KEY_RAW)) { edInit.putBoolean(PrefProvider.KEY_RAW, true); changed = true; }
-        if (!prefs.contains(PrefProvider.KEY_LEICA)) { edInit.putBoolean(PrefProvider.KEY_LEICA, true); changed = true; }
-        if (!prefs.contains(PrefProvider.KEY_DUAL_VIDEO)) { edInit.putBoolean(PrefProvider.KEY_DUAL_VIDEO, true); changed = true; }
-        if (!prefs.contains(PrefProvider.KEY_SHUTTER)) { edInit.putBoolean(PrefProvider.KEY_SHUTTER, true); changed = true; }
-        if (!prefs.contains(PrefProvider.KEY_DISABLE_THERMAL)) { edInit.putBoolean(PrefProvider.KEY_DISABLE_THERMAL, true); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_4K60)) { edInit.putBoolean(PrefProvider.KEY_4K60, false); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_BITRATE)) { edInit.putBoolean(PrefProvider.KEY_BITRATE, false); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_RAW)) { edInit.putBoolean(PrefProvider.KEY_RAW, false); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_LEICA)) { edInit.putBoolean(PrefProvider.KEY_LEICA, false); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_DUAL_VIDEO)) { edInit.putBoolean(PrefProvider.KEY_DUAL_VIDEO, false); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_SHUTTER)) { edInit.putBoolean(PrefProvider.KEY_SHUTTER, false); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_DISABLE_THERMAL)) { edInit.putBoolean(PrefProvider.KEY_DISABLE_THERMAL, false); changed = true; }
+        if (!prefs.contains(PrefProvider.KEY_HIGH_RES_PHOTO)) { edInit.putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, false); changed = true; }
         if (changed) {
             edInit.commit();
-            makePrefsWorldReadable();
+            saveToSettings();
         }
 
         loadPreferences();
@@ -77,12 +85,13 @@ public class MainActivity extends Activity {
                 updateToggleAllButtonText(btnEnableAll);
             }
         });
+        saveToSettings();
     }
 
     private boolean areAllEnabled() {
         return sw4k60.isChecked() && swBitrate.isChecked() && swRaw.isChecked()
                 && swLeica.isChecked() && swDualVideo.isChecked() && swShutter.isChecked()
-                && swThermal.isChecked();
+                && swThermal.isChecked() && swHighResPhoto.isChecked();
     }
 
     private void updateToggleAllButtonText(Button btn) {
@@ -92,13 +101,14 @@ public class MainActivity extends Activity {
     }
 
     private void loadPreferences() {
-        sw4k60.setChecked(prefs.getBoolean(PrefProvider.KEY_4K60, true));
-        swBitrate.setChecked(prefs.getBoolean(PrefProvider.KEY_BITRATE, true));
-        swRaw.setChecked(prefs.getBoolean(PrefProvider.KEY_RAW, true));
-        swLeica.setChecked(prefs.getBoolean(PrefProvider.KEY_LEICA, true));
-        swDualVideo.setChecked(prefs.getBoolean(PrefProvider.KEY_DUAL_VIDEO, true));
-        swShutter.setChecked(prefs.getBoolean(PrefProvider.KEY_SHUTTER, true));
-        swThermal.setChecked(prefs.getBoolean(PrefProvider.KEY_DISABLE_THERMAL, true));
+        sw4k60.setChecked(prefs.getBoolean(PrefProvider.KEY_4K60, false));
+        swBitrate.setChecked(prefs.getBoolean(PrefProvider.KEY_BITRATE, false));
+        swRaw.setChecked(prefs.getBoolean(PrefProvider.KEY_RAW, false));
+        swLeica.setChecked(prefs.getBoolean(PrefProvider.KEY_LEICA, false));
+        swDualVideo.setChecked(prefs.getBoolean(PrefProvider.KEY_DUAL_VIDEO, false));
+        swShutter.setChecked(prefs.getBoolean(PrefProvider.KEY_SHUTTER, false));
+        swThermal.setChecked(prefs.getBoolean(PrefProvider.KEY_DISABLE_THERMAL, false));
+        swHighResPhoto.setChecked(prefs.getBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, false));
     }
 
     private void setupListeners() {
@@ -111,6 +121,7 @@ public class MainActivity extends Activity {
         swDualVideo.setOnCheckedChangeListener(listener);
         swShutter.setOnCheckedChangeListener(listener);
         swThermal.setOnCheckedChangeListener(listener);
+        swHighResPhoto.setOnCheckedChangeListener(listener);
     }
 
     private class CompoundButtonListener implements android.widget.CompoundButton.OnCheckedChangeListener {
@@ -132,26 +143,25 @@ public class MainActivity extends Activity {
             else if (id == R.id.switch_dual_video) ed.putBoolean(PrefProvider.KEY_DUAL_VIDEO, isChecked);
             else if (id == R.id.switch_shutter) ed.putBoolean(PrefProvider.KEY_SHUTTER, isChecked);
             else if (id == R.id.switch_thermal) ed.putBoolean(PrefProvider.KEY_DISABLE_THERMAL, isChecked);
+            else if (id == R.id.switch_high_res_photo) ed.putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, isChecked);
             ed.commit();
-            makePrefsWorldReadable();
+            saveToSettings();
             updateToggleAllButtonText(btnToggle);
+            Toast.makeText(MainActivity.this, isChecked ? "Feature enabled - Restart Camera to apply" : "Feature disabled - Restart Camera to apply", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void makePrefsWorldReadable() {
+    private void saveToSettings() {
         try {
-            File dataDir = new File(getApplicationInfo().dataDir);
-            File prefsDir = new File(dataDir, "shared_prefs");
-            File prefsFile = new File(prefsDir, PrefProvider.PREFS_NAME + ".xml");
-            dataDir.setExecutable(true, false);
-            prefsDir.setExecutable(true, false);
-            prefsDir.setReadable(true, false);
-            if (prefsFile.exists()) {
-                prefsFile.setReadable(true, false);
-            }
-            // Root chmod ensures reading across LSPosed / Vector context
-            String pkg = getPackageName();
-            Runtime.getRuntime().exec(new String[]{"su", "-c", "chmod 777 /data/data/" + pkg + "/shared_prefs; chmod 666 /data/data/" + pkg + "/shared_prefs/*"});
+            String cmd = "settings put global cameratools_4k60 " + (sw4k60.isChecked() ? "1" : "0") + " ; " +
+                    "settings put global cameratools_bitrate " + (swBitrate.isChecked() ? "1" : "0") + " ; " +
+                    "settings put global cameratools_raw " + (swRaw.isChecked() ? "1" : "0") + " ; " +
+                    "settings put global cameratools_leica " + (swLeica.isChecked() ? "1" : "0") + " ; " +
+                    "settings put global cameratools_dual " + (swDualVideo.isChecked() ? "1" : "0") + " ; " +
+                    "settings put global cameratools_shutter " + (swShutter.isChecked() ? "1" : "0") + " ; " +
+                    "settings put global cameratools_thermal " + (swThermal.isChecked() ? "1" : "0") + " ; " +
+                    "settings put global cameratools_high_res " + (swHighResPhoto.isChecked() ? "1" : "0");
+            Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
         } catch (Throwable ignored) {}
     }
 
@@ -163,6 +173,7 @@ public class MainActivity extends Activity {
         swDualVideo.setChecked(state);
         swShutter.setChecked(state);
         swThermal.setChecked(state);
+        swHighResPhoto.setChecked(state);
         prefs.edit()
             .putBoolean(PrefProvider.KEY_4K60, state)
             .putBoolean(PrefProvider.KEY_BITRATE, state)
@@ -171,8 +182,9 @@ public class MainActivity extends Activity {
             .putBoolean(PrefProvider.KEY_DUAL_VIDEO, state)
             .putBoolean(PrefProvider.KEY_SHUTTER, state)
             .putBoolean(PrefProvider.KEY_DISABLE_THERMAL, state)
+            .putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, state)
             .commit();
-        makePrefsWorldReadable();
+        saveToSettings();
         Toast.makeText(this, state ? "All features activated" : "All features deactivated", Toast.LENGTH_SHORT).show();
     }
 

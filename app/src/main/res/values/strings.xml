@@ -1,28 +1,31 @@
-﻿<resources>
+<resources>
     <string name="app_name">CameraTools</string>
     <string name="app_subtitle">Xiaomi Redmi Note 12 Pro 5G (ruby)</string>
-    <string name="xposed_description">Camera and ISP Subsystem Tweaks: 4K 60FPS, 150Mbps Bitrate, 50MP RAW, Leica Profiles, Dual Video</string>
+    <string name="xposed_description">Camera and ISP Tweaks for Redmi Note 12 Pro 5G: 4K 60FPS, 150Mbps Bitrate, 50MP RAW, 50MP Normal Photo, Leica Profiles, Dual Video, Long Exposure, Thermal Bypass.</string>
     
     <string name="title_4k60">4K 60FPS Video Recording</string>
-    <string name="desc_4k60">Unlocks true 3840x2160 @ 60 FPS recording in MIUI / HyperOS Camera. Bypasses MediaTek HAL streaming resolution limits and adds the native 60 FPS toggle switch.</string>
+    <string name="desc_4k60">Unlocks smooth 4K video recording at 60 frames per second.</string>
 
-    <string name="title_bitrate">Cinematic Ultra Bitrate (150 Mbps)</string>
-    <string name="desc_bitrate">Boosts default 4K video recording from 42 Mbps up to 150 Mbps HEVC (c2.mtk.hevc.encoder) for crystal-clear master quality with zero compression banding.</string>
+    <string name="title_bitrate">Ultra High Video Quality</string>
+    <string name="desc_bitrate">Improves video recording quality for much clearer videos.</string>
 
-    <string name="title_raw">50MP Full Bayer RAW (DNG)</string>
-    <string name="desc_raw">Enables true 50-megapixel uncompressed RAW (.dng) sensor capture in Pro Mode directly from the Sony IMX766 quad-bayer matrix.</string>
+    <string name="title_raw">50MP RAW Photos</string>
+    <string name="desc_raw">Enables uncompressed 50-megapixel RAW photos in Pro Mode.</string>
 
-    <string name="title_leica">Leica Profiles &amp; Watermark</string>
-    <string name="desc_leica">Injects Leica Authentic and Leica Vibrant color science tuning profiles, Leica optics simulation, and the official Leica branded watermark.</string>
+    <string name="title_leica">Leica Camera Modes</string>
+    <string name="desc_leica">Adds Leica Authentic and Leica Vibrant camera modes and Leica watermark.</string>
 
-    <string name="title_dual_video">Dual-Camera Concurrent Stream</string>
-    <string name="desc_dual_video">Unlocks Director Mode: simultaneous front (OV16A1Q) + rear (Sony IMX766) multi-camera video recording with real-time preview.</string>
+    <string name="title_dual_video">Dual-Camera Video</string>
+    <string name="desc_dual_video">Record video using the front and rear cameras at the same time.</string>
 
-    <string name="title_shutter">Extended Pro Exposure Range</string>
-    <string name="desc_shutter">Expands Pro mode exposure time up to 60 seconds long exposure for astrophotography and up to 1/16000s ultra-fast electronic shutter.</string>
+    <string name="title_shutter">Pro Mode Long Exposure</string>
+    <string name="desc_shutter">Allows taking very long exposure photos (up to 60 seconds) in Pro Mode.</string>
 
-    <string name="title_thermal">Bypass Thermal Warning &amp; Shutdown</string>
-    <string name="desc_thermal">Completely disables MIUI / HyperOS thermal warnings, video recording overheat alerts, and forced camera shutdown. Camera will never close due to high temperature.</string>
+    <string name="title_thermal">Disable Overheating Limits</string>
+    <string name="desc_thermal">Stops the camera from closing automatically when the phone gets warm.</string>
+
+    <string name="title_highres_photo">50MP Normal Photo</string>
+    <string name="desc_highres_photo">Makes the standard Photo mode take full 50-megapixel pictures.</string>
 
     <string name="btn_restart_camera">Restart Camera</string>
     <string name="btn_enable_all">Enable All</string>

@@ -19,14 +19,15 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 public class HookMain implements IXposedHookLoadPackage {
     private static final String TAG = "CameraTools";
 
-    // Feature toggles (defaulting to true)
-    private boolean enable4k60 = true;
-    private boolean enableBitrate = true;
-    private boolean enableRaw = true;
-    private boolean enableLeica = true;
-    private boolean enableDualVideo = true;
-    private boolean enableShutter = true;
-    private boolean enableDisableThermal = true;
+    // Feature toggles (defaulting to false as requested)
+    private boolean enable4k60 = false;
+    private boolean enableBitrate = false;
+    private boolean enableRaw = false;
+    private boolean enableLeica = false;
+    private boolean enableDualVideo = false;
+    private boolean enableShutter = false;
+    private boolean enableDisableThermal = false;
+    private boolean enableHighResPhoto = false; // opt-in — default OFF (requires camera restart to take effect)
 
     private XSharedPreferences xsp;
 
@@ -63,20 +64,24 @@ public class HookMain implements IXposedHookLoadPackage {
 
         // 7. Complete Thermal Warning & Forced Shutdown Bypass
         hookThermalBypass(lpparam);
+
+        // 8. 50MP Normal Photo — MediaTek ISP remosaic in standard photo mode
+        hookHighResPhoto(lpparam);
     }
 
     private void loadPreferences() {
         try {
-            xsp = new XSharedPreferences("io.github.official_arvind.cameratools", PrefProvider.PREFS_NAME);
+            xsp = new XSharedPreferences("io.github.official_arvind.cameratools");
             xsp.makeWorldReadable();
             xsp.reload();
-            enable4k60 = xsp.getBoolean(PrefProvider.KEY_4K60, true);
-            enableBitrate = xsp.getBoolean(PrefProvider.KEY_BITRATE, true);
-            enableRaw = xsp.getBoolean(PrefProvider.KEY_RAW, true);
-            enableLeica = xsp.getBoolean(PrefProvider.KEY_LEICA, true);
-            enableDualVideo = xsp.getBoolean(PrefProvider.KEY_DUAL_VIDEO, true);
-            enableShutter = xsp.getBoolean(PrefProvider.KEY_SHUTTER, true);
-            enableDisableThermal = xsp.getBoolean(PrefProvider.KEY_DISABLE_THERMAL, true);
+            enable4k60 = xsp.getBoolean(PrefProvider.KEY_4K60, false);
+            enableBitrate = xsp.getBoolean(PrefProvider.KEY_BITRATE, false);
+            enableRaw = xsp.getBoolean(PrefProvider.KEY_RAW, false);
+            enableLeica = xsp.getBoolean(PrefProvider.KEY_LEICA, false);
+            enableDualVideo = xsp.getBoolean(PrefProvider.KEY_DUAL_VIDEO, false);
+            enableShutter = xsp.getBoolean(PrefProvider.KEY_SHUTTER, false);
+            enableDisableThermal = xsp.getBoolean(PrefProvider.KEY_DISABLE_THERMAL, false);
+            enableHighResPhoto = xsp.getBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, false);
             XposedBridge.log("[" + TAG + "] Preferences loaded: 4k60=" + enable4k60 + ", bitrate=" + enableBitrate +
                     ", raw=" + enableRaw + ", leica=" + enableLeica + ", dual=" + enableDualVideo + ", shutter=" + enableShutter +
                     ", thermalBypass=" + enableDisableThermal);
@@ -87,32 +92,31 @@ public class HookMain implements IXposedHookLoadPackage {
 
     private void hookContextReload(final XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            Class<?> appClass = XposedHelpers.findClass("com.android.camera.CameraAppImpl", lpparam.classLoader);
-            XposedBridge.hookAllMethods(appClass, "onCreate", new XC_MethodHook() {
+            XposedHelpers.findAndHookMethod(android.content.ContextWrapper.class, "attachBaseContext", android.content.Context.class, new XC_MethodHook() {
                 @Override
-                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                     try {
-                        Context ctx = (Context) param.thisObject;
-                        android.net.Uri uri = android.net.Uri.parse("content://" + PrefProvider.AUTHORITY);
-                        android.os.Bundle b = ctx.getContentResolver().call(uri, "get_all", null, null);
-                        if (b != null) {
-                            enable4k60 = b.getBoolean(PrefProvider.KEY_4K60, true);
-                            enableBitrate = b.getBoolean(PrefProvider.KEY_BITRATE, true);
-                            enableRaw = b.getBoolean(PrefProvider.KEY_RAW, true);
-                            enableLeica = b.getBoolean(PrefProvider.KEY_LEICA, true);
-                            enableDualVideo = b.getBoolean(PrefProvider.KEY_DUAL_VIDEO, true);
-                            enableShutter = b.getBoolean(PrefProvider.KEY_SHUTTER, true);
-                            enableDisableThermal = b.getBoolean(PrefProvider.KEY_DISABLE_THERMAL, true);
-                            XposedBridge.log("[" + TAG + "] Preferences updated via PrefProvider IPC: 4k60=" + enable4k60 +
-                                    ", bitrate=" + enableBitrate + ", raw=" + enableRaw + ", leica=" + enableLeica +
-                                    ", dual=" + enableDualVideo + ", shutter=" + enableShutter + ", thermalBypass=" + enableDisableThermal);
-                        }
+                        Context ctx = (Context) param.args[0];
+                        android.content.ContentResolver cr = ctx.getContentResolver();
+                        enable4k60 = android.provider.Settings.Global.getInt(cr, "cameratools_4k60", 0) == 1;
+                        enableBitrate = android.provider.Settings.Global.getInt(cr, "cameratools_bitrate", 0) == 1;
+                        enableRaw = android.provider.Settings.Global.getInt(cr, "cameratools_raw", 0) == 1;
+                        enableLeica = android.provider.Settings.Global.getInt(cr, "cameratools_leica", 0) == 1;
+                        enableDualVideo = android.provider.Settings.Global.getInt(cr, "cameratools_dual", 0) == 1;
+                        enableShutter = android.provider.Settings.Global.getInt(cr, "cameratools_shutter", 0) == 1;
+                        enableDisableThermal = android.provider.Settings.Global.getInt(cr, "cameratools_thermal", 0) == 1;
+                        enableHighResPhoto = android.provider.Settings.Global.getInt(cr, "cameratools_high_res", 0) == 1;
+                        XposedBridge.log("[" + TAG + "] Preferences updated via attachBaseContext: 4k60=" + enable4k60 +
+                                ", bitrate=" + enableBitrate + ", raw=" + enableRaw + ", leica=" + enableLeica +
+                                ", dual=" + enableDualVideo + ", shutter=" + enableShutter + ", thermalBypass=" + enableDisableThermal);
                     } catch (Throwable t) {
-                        XposedBridge.log("[" + TAG + "] PrefProvider IPC query note: " + t.getMessage());
+                        XposedBridge.log("[" + TAG + "] Pref query note: " + t.getMessage());
                     }
                 }
             });
-        } catch (Throwable ignored) {}
+        } catch (Throwable t) {
+            XposedBridge.log("[" + TAG + "] Hook attachBaseContext failed: " + t.getMessage());
+        }
     }
 
     // ==========================================
@@ -906,6 +910,78 @@ public class HookMain implements IXposedHookLoadPackage {
             XposedBridge.log("[" + TAG + "] Full Thermal Warning & Shutdown Bypass successfully hooked");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook Thermal Bypass overall error: " + t.getMessage());
+        }
+    }
+
+    // ==========================================
+    // 8. 50MP Normal Photo — MediaTek ISP remosaic
+    // ==========================================
+    private void hookHighResPhoto(final XC_LoadPackage.LoadPackageParam lpparam) {
+        try {
+            // Hook 1: MiCamera2.alwaysUseRemosaicSize() -> forces wide remote surface
+            Class<?> miCamera2 = XposedHelpers.findClass("com.android.camera2.MiCamera2", lpparam.classLoader);
+            XposedBridge.hookAllMethods(miCamera2, "alwaysUseRemosaicSize", new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                    if (!enableHighResPhoto) return;
+                    param.setResult(true);
+                }
+            });
+
+
+            XC_MethodHook sizeListHook = new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    if (!enableHighResPhoto) return;
+                    if (param.args.length >= 1 && param.args[0] instanceof Integer) {
+                        int format = (Integer) param.args[0];
+                        if (format == 256) { // ImageFormat.JPEG
+                            Object result = param.getResult();
+                            if (result instanceof java.util.List) {
+                                java.util.List list = (java.util.List) result;
+                                boolean has50mp = false;
+                                for (Object obj : list) {
+                                    try {
+                                        int w = (int) XposedHelpers.callMethod(obj, "getWidth");
+                                        int h = (int) XposedHelpers.callMethod(obj, "getHeight");
+                                        if ((w == 8192 && h == 6144) || (w == 6144 && h == 8192)) {
+                                            has50mp = true;
+                                            break;
+                                        }
+                                    } catch (Throwable ignored) {}
+                                }
+                                if (!has50mp) {
+                                    try {
+                                        Class<?> cameraSizeClass = XposedHelpers.findClass("com.android.camera.CameraSize", lpparam.classLoader);
+                                        java.lang.reflect.Constructor<?> ctor = cameraSizeClass.getConstructor(int.class, int.class);
+                                        // 4:3
+                                        list.add(0, ctor.newInstance(8192, 6144));
+                                        list.add(0, ctor.newInstance(6144, 8192));
+                                        // 16:9
+                                        list.add(0, ctor.newInstance(8192, 4608));
+                                        list.add(0, ctor.newInstance(4608, 8192));
+                                        // 1:1
+                                        list.add(0, ctor.newInstance(6144, 6144));
+                                        // 20:9
+                                        list.add(0, ctor.newInstance(8192, 3692));
+                                        list.add(0, ctor.newInstance(3692, 8192));
+                                    } catch (Throwable t) {
+                                        XposedBridge.log("[" + TAG + "] Error injecting CameraSize: " + t.getMessage());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            
+            Class<?> capsClass = XposedHelpers.findClass("com.android.camera2.CameraCapabilities", lpparam.classLoader);
+            XposedBridge.hookAllMethods(capsClass, "getSupportedOutputSizeWithAssignedMode", sizeListHook);
+            XposedBridge.hookAllMethods(capsClass, "getSupportedOutputSize", sizeListHook);
+
+            XposedBridge.log("[" + TAG + "] 50MP Normal Photo successfully hooked");
+        } catch (Throwable t) {
+            XposedBridge.log("[" + TAG + "] Hook 50MP Normal Photo failed: " + t.getMessage());
         }
     }
 }

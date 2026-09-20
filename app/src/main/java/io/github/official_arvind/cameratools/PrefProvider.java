@@ -10,7 +10,7 @@ import android.os.Bundle;
 
 public class PrefProvider extends ContentProvider {
     public static final String AUTHORITY = "io.github.official_arvind.cameratools.prefs";
-    public static final String PREFS_NAME = "camera_tools_prefs";
+    public static final String PREFS_NAME = "io.github.official_arvind.cameratools_preferences";
 
     public static final String KEY_4K60 = "pref_4k60";
     public static final String KEY_BITRATE = "pref_bitrate";
@@ -19,6 +19,7 @@ public class PrefProvider extends ContentProvider {
     public static final String KEY_DUAL_VIDEO = "pref_dual_video";
     public static final String KEY_SHUTTER = "pref_shutter";
     public static final String KEY_DISABLE_THERMAL = "pref_disable_thermal";
+    public static final String KEY_HIGH_RES_PHOTO = "pref_high_res_photo";
 
     @Override
     public boolean onCreate() {
@@ -29,21 +30,23 @@ public class PrefProvider extends ContentProvider {
     public Bundle call(String method, String arg, Bundle extras) {
         Context ctx = getContext();
         if (ctx == null) return null;
-        SharedPreferences sp = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        Context deCtx = ctx.isDeviceProtectedStorage() ? ctx : ctx.createDeviceProtectedStorageContext();
+        SharedPreferences sp = deCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
         if ("get_all".equals(method)) {
             Bundle b = new Bundle();
-            b.putBoolean(KEY_4K60, sp.getBoolean(KEY_4K60, true));
-            b.putBoolean(KEY_BITRATE, sp.getBoolean(KEY_BITRATE, true));
-            b.putBoolean(KEY_RAW, sp.getBoolean(KEY_RAW, true));
-            b.putBoolean(KEY_LEICA, sp.getBoolean(KEY_LEICA, true));
-            b.putBoolean(KEY_DUAL_VIDEO, sp.getBoolean(KEY_DUAL_VIDEO, true));
-            b.putBoolean(KEY_SHUTTER, sp.getBoolean(KEY_SHUTTER, true));
-            b.putBoolean(KEY_DISABLE_THERMAL, sp.getBoolean(KEY_DISABLE_THERMAL, true));
+            b.putBoolean(KEY_4K60, sp.getBoolean(KEY_4K60, false));
+            b.putBoolean(KEY_BITRATE, sp.getBoolean(KEY_BITRATE, false));
+            b.putBoolean(KEY_RAW, sp.getBoolean(KEY_RAW, false));
+            b.putBoolean(KEY_LEICA, sp.getBoolean(KEY_LEICA, false));
+            b.putBoolean(KEY_DUAL_VIDEO, sp.getBoolean(KEY_DUAL_VIDEO, false));
+            b.putBoolean(KEY_SHUTTER, sp.getBoolean(KEY_SHUTTER, false));
+            b.putBoolean(KEY_DISABLE_THERMAL, sp.getBoolean(KEY_DISABLE_THERMAL, false));
+            b.putBoolean(KEY_HIGH_RES_PHOTO, sp.getBoolean(KEY_HIGH_RES_PHOTO, false));
             return b;
         } else if ("get_boolean".equals(method)) {
             Bundle b = new Bundle();
-            b.putBoolean("value", sp.getBoolean(arg, true));
+            b.putBoolean("value", sp.getBoolean(arg, false));
             return b;
         }
         return null;

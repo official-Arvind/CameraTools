@@ -31,8 +31,8 @@ $flatFiles = Get-ChildItem "$buildDir\compiled_res\*.flat" | ForEach-Object { $_
     --manifest "app\src\main\AndroidManifest.xml" `
     --java "$buildDir\gen" `
     --custom-package "io.github.official_arvind.cameratools" `
-    --version-code 101 `
-    --version-name "1.1.0" `
+    --version-code 105 `
+    --version-name "1.2.0" `
     -o "$buildDir\unaligned.apk" `
     $flatFiles
 if ($LASTEXITCODE -ne 0) { throw "AAPT2 link failed!" }
@@ -75,8 +75,8 @@ print('Injected classes.dex and assets/xposed_init successfully')
 if ($LASTEXITCODE -ne 0) { throw "Zip injection failed!" }
 
 Write-Host "[7/7] Aligning & Signing with Arvind's release keystore..."
-$outApk = "release\io.github.official_arvind.cameratools-v1.1.0.apk"
-$legacyApk = "release\com.jigar.cameratools-v1.1.0.apk"
+$outApk = "release\io.github.official_arvind.cameratools-v1.2.0.apk"
+$legacyApk = "release\com.jigar.cameratools-v1.2.0.apk"
 if (Test-Path $outApk) { Remove-Item -Force $outApk }
 if (Test-Path $legacyApk) { Remove-Item -Force $legacyApk }
 & $zipalign -p -f 4 "$buildDir\unaligned.apk" $outApk
