@@ -1,5 +1,7 @@
 <h1 align="center">
-  CameraTools
+  <picture>
+    <img src="assets/logo.svg" alt="CameraTools">
+  </picture>
 </h1>
 
 <p align="center">
@@ -55,3 +57,4 @@ If a feature fails to hook or crashes your camera, please create a [GitHub issue
 ## License
 
 [![GPL-3.0-only](https://img.shields.io/badge/LICENSE-GPL--3.0--only-%23A42E2B?style=for-the-badge&logo=gnu&logoColor=white&logoPosition=right)](LICENSE)
+
