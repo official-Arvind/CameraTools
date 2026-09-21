@@ -41,6 +41,7 @@ public class HookMain implements IXposedHookLoadPackage {
 
         loadPreferences();
 
+
         // PrefProvider IPC sync hook
         hookContextReload(lpparam);
 
@@ -948,10 +949,30 @@ public class HookMain implements IXposedHookLoadPackage {
                     }
                     if (originalResult) return; // Already true, do nothing
                     
+                    // Do not spoof if it's the front camera!
+                    try {
+                        Class<?> csClass = XposedHelpers.findClass("com.android.camera.CameraSettings", lpparam.classLoader);
+                        java.lang.reflect.Method m = csClass.getDeclaredMethod("isFrontCamera");
+                        m.setAccessible(true);
+                        boolean isFront = (boolean) m.invoke(null);
+                        if (isFront) {
+                            return; // Do not apply 50MP to front camera
+                        }
+                    } catch (Throwable ignored) {
+                        try {
+                            Class<?> csClass = XposedHelpers.findClass("com.android.camera.CameraSettings", lpparam.classLoader);
+                            java.lang.reflect.Method m = csClass.getDeclaredMethod("getCameraId");
+                            m.setAccessible(true);
+                            int cameraId = (int) m.invoke(null);
+                            if (cameraId == 1) { // 1 is usually front camera
+                                return;
+                            }
+                        } catch (Throwable ignored2) {}
+                    }
+                    
                     StackTraceElement[] stack = Thread.currentThread().getStackTrace();
                     for (StackTraceElement element : stack) {
                         String className = element.getClassName();
-                        // If the call originated from the camera2 backend, spoof true!
                         if (className.startsWith("com.android.camera2.") || 
                             className.startsWith("android.hardware.camera2")) {
                             param.setResult(true);
@@ -1021,6 +1042,10 @@ public class HookMain implements IXposedHookLoadPackage {
         }
     }
 }
+
+
+
+
 
 
 
