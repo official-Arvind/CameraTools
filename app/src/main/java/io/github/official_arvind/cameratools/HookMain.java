@@ -96,21 +96,27 @@ public class HookMain implements IXposedHookLoadPackage {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                     try {
-                        Context ctx = (Context) param.args[0];
+                                                Context ctx = (Context) param.args[0];
                         android.content.ContentResolver cr = ctx.getContentResolver();
-                        enable4k60 = android.provider.Settings.Global.getInt(cr, "cameratools_4k60", 0) == 1;
-                        enableBitrate = android.provider.Settings.Global.getInt(cr, "cameratools_bitrate", 0) == 1;
-                        enableRaw = android.provider.Settings.Global.getInt(cr, "cameratools_raw", 0) == 1;
-                        enableLeica = android.provider.Settings.Global.getInt(cr, "cameratools_leica", 0) == 1;
-                        enableDualVideo = android.provider.Settings.Global.getInt(cr, "cameratools_dual", 0) == 1;
-                        enableShutter = android.provider.Settings.Global.getInt(cr, "cameratools_shutter", 0) == 1;
-                        enableDisableThermal = android.provider.Settings.Global.getInt(cr, "cameratools_thermal", 0) == 1;
-                        enableHighResPhoto = android.provider.Settings.Global.getInt(cr, "cameratools_high_res", 0) == 1;
-                        XposedBridge.log("[" + TAG + "] Preferences updated via attachBaseContext: 4k60=" + enable4k60 +
-                                ", bitrate=" + enableBitrate + ", raw=" + enableRaw + ", leica=" + enableLeica +
-                                ", dual=" + enableDualVideo + ", shutter=" + enableShutter + ", thermalBypass=" + enableDisableThermal);
+                        try {
+                            android.net.Uri uri = android.net.Uri.parse("content://io.github.official_arvind.cameratools.prefs");
+                            android.os.Bundle b = cr.call(uri, "get_all", null, null);
+                            if (b != null) {
+                                enable4k60 = b.getBoolean("pref_4k60", false);
+                                enableBitrate = b.getBoolean("pref_bitrate", false);
+                                enableRaw = b.getBoolean("pref_raw", false);
+                                enableLeica = b.getBoolean("pref_leica", false);
+                                enableDualVideo = b.getBoolean("pref_dual_video", false);
+                                enableShutter = b.getBoolean("pref_shutter", false);
+                                enableDisableThermal = b.getBoolean("pref_disable_thermal", false);
+                                enableHighResPhoto = b.getBoolean("pref_high_res_photo", false);
+                                XposedBridge.log("[" + TAG + "] Preferences updated via ContentProvider: 4k60=" + enable4k60);
+                            }
+                        } catch (Throwable cpErr) {
+                            XposedBridge.log("[" + TAG + "] PrefProvider failed: " + cpErr.getMessage());
+                        }
                     } catch (Throwable t) {
-                        XposedBridge.log("[" + TAG + "] Pref query note: " + t.getMessage());
+                        XposedBridge.log("[" + TAG + "] Hook Context reload error: " + t.getMessage());
                     }
                 }
             });
@@ -1015,6 +1021,7 @@ public class HookMain implements IXposedHookLoadPackage {
         }
     }
 }
+
 
 
 

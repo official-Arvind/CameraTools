@@ -42,6 +42,9 @@ public class MainActivity extends Activity {
         if (android.os.Build.VERSION.SDK_INT >= 29) {
             window.setNavigationBarContrastEnforced(false);
         }
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false);
+        }
 
         setContentView(R.layout.activity_main);
         
@@ -252,6 +255,7 @@ public class MainActivity extends Activity {
         }).start();
     }
 }
+
 
 
 
