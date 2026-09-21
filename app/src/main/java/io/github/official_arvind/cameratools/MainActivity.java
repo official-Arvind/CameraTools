@@ -36,32 +36,35 @@ public class MainActivity extends Activity {
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(Color.TRANSPARENT);
         window.setNavigationBarColor(Color.TRANSPARENT);
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            window.setNavigationBarContrastEnforced(false);
+        }
 
         setContentView(R.layout.activity_main);
         
         final View bottomBar = findViewById(R.id.bottom_bar);
+                final View scrollView = findViewById(R.id.scroll_view);
         bottomBar.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
             @Override
             public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
                 int bottom = insets.getSystemWindowInsetBottom();
                 int dp16 = (int)(16 * getResources().getDisplayMetrics().density);
-                int dp12 = (int)(12 * getResources().getDisplayMetrics().density);
-                v.setPadding(dp16, dp12, dp16, dp16 + bottom);
-                return insets;
-            }
-        });
-        
-        final View scrollView = findViewById(R.id.scroll_view);
-        scrollView.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
-            @Override
-            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                
+                android.widget.RelativeLayout.LayoutParams params = (android.widget.RelativeLayout.LayoutParams) v.getLayoutParams();
+                params.bottomMargin = dp16 + bottom;
+                v.setLayoutParams(params);
+                
                 int top = insets.getSystemWindowInsetTop();
                 int dp20 = (int)(20 * getResources().getDisplayMetrics().density);
-                int dp16 = (int)(16 * getResources().getDisplayMetrics().density);
                 int dp24 = (int)(24 * getResources().getDisplayMetrics().density);
-                v.setPadding(dp16, dp20 + top, dp16, dp24);
+                
+                // bottomBar height is roughly 64dp. Plus margins (16dp top/bottom) = 96dp + bottom insets.
+                int bottomBarTotalHeight = (int)(96 * getResources().getDisplayMetrics().density) + bottom;
+                scrollView.setPadding(dp16, dp20 + top, dp16, dp24 + bottomBarTotalHeight);
+                
                 return insets;
             }
         });
@@ -249,6 +252,12 @@ public class MainActivity extends Activity {
         }).start();
     }
 }
+
+
+
+
+
+
 
 
 

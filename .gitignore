@@ -38,4 +38,7 @@ Desktop.ini
 build_apk.ps1
 hx_*
 temp*
- 
+xposed-rewrite/
+Test*
+*screenshot*
+.gitignore
