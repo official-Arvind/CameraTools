@@ -221,16 +221,11 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                boolean success = false;
                 try {
-                    Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "am force-stop com.android.camera"});
-                    p.waitFor();
-                    if (p.exitValue() == 0) {
-                        success = true;
-                    }
+                    android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                    am.killBackgroundProcesses("com.android.camera");
                 } catch (Exception ignored) {}
                 
-                final boolean rootSuccess = success;
                 try { Thread.sleep(600); } catch (InterruptedException ignored) {}
                 runOnUiThread(new Runnable() {
                     @Override
@@ -239,15 +234,15 @@ public class MainActivity extends Activity {
                             btnRestart.setEnabled(true);
                             btnRestart.setText(R.string.btn_restart_camera);
                         }
-                        if (rootSuccess) {
-                            android.widget.Toast.makeText(MainActivity.this, "Camera restarted!", android.widget.Toast.LENGTH_SHORT).show();
-                        } else {
-                            android.widget.Toast.makeText(MainActivity.this, "Root denied! Please Force Stop the Camera app manually.", android.widget.Toast.LENGTH_LONG).show();
-                            try {
-                                android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                                intent.setData(android.net.Uri.parse("package:com.android.camera"));
+                        try {
+                            android.content.Intent intent = getPackageManager().getLaunchIntentForPackage("com.android.camera");
+                            if (intent != null) {
+                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK);
                                 startActivity(intent);
-                            } catch (Exception ignored) {}
+                                android.widget.Toast.makeText(MainActivity.this, "Camera restarted!", android.widget.Toast.LENGTH_SHORT).show();
+                            }
+                        } catch (Exception e) {
+                            android.widget.Toast.makeText(MainActivity.this, "Please force stop Camera manually.", android.widget.Toast.LENGTH_LONG).show();
                         }
                     }
                 });
@@ -255,6 +250,7 @@ public class MainActivity extends Activity {
         }).start();
     }
 }
+
 
 
 

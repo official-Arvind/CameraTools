@@ -6,6 +6,8 @@
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
 
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+
     <application
         android:resizeableActivity="true"
         android:allowBackup="true"
@@ -47,6 +49,9 @@
     </application>
 
 </manifest>
+
+
+
 
 
 
