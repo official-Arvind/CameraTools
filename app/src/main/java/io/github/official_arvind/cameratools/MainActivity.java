@@ -5,6 +5,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowInsets;
+import android.graphics.Color;
+import android.view.View;
 import android.widget.Button;
 import android.widget.Switch;
 import android.widget.Toast;
@@ -26,7 +30,42 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        Window window = getWindow();
+        window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+
         setContentView(R.layout.activity_main);
+        
+        final View bottomBar = findViewById(R.id.bottom_bar);
+        bottomBar.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                int bottom = insets.getSystemWindowInsetBottom();
+                int dp16 = (int)(16 * getResources().getDisplayMetrics().density);
+                int dp12 = (int)(12 * getResources().getDisplayMetrics().density);
+                v.setPadding(dp16, dp12, dp16, dp16 + bottom);
+                return insets;
+            }
+        });
+        
+        final View scrollView = findViewById(R.id.scroll_view);
+        scrollView.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                int top = insets.getSystemWindowInsetTop();
+                int dp20 = (int)(20 * getResources().getDisplayMetrics().density);
+                int dp16 = (int)(16 * getResources().getDisplayMetrics().density);
+                int dp24 = (int)(24 * getResources().getDisplayMetrics().density);
+                v.setPadding(dp16, dp20 + top, dp16, dp24);
+                return insets;
+            }
+        });
+
 
         Context deCtx = isDeviceProtectedStorage() ? this : createDeviceProtectedStorageContext();
         try {
@@ -57,8 +96,7 @@ public class MainActivity extends Activity {
         if (!prefs.contains(PrefProvider.KEY_HIGH_RES_PHOTO)) { edInit.putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, false); changed = true; }
         if (changed) {
             edInit.commit();
-            saveToSettings();
-        }
+                    }
 
         loadPreferences();
         setupListeners();
@@ -85,8 +123,7 @@ public class MainActivity extends Activity {
                 updateToggleAllButtonText(btnEnableAll);
             }
         });
-        saveToSettings();
-    }
+            }
 
     private boolean areAllEnabled() {
         return sw4k60.isChecked() && swBitrate.isChecked() && swRaw.isChecked()
@@ -145,25 +182,12 @@ public class MainActivity extends Activity {
             else if (id == R.id.switch_thermal) ed.putBoolean(PrefProvider.KEY_DISABLE_THERMAL, isChecked);
             else if (id == R.id.switch_high_res_photo) ed.putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, isChecked);
             ed.commit();
-            saveToSettings();
-            updateToggleAllButtonText(btnToggle);
+                        updateToggleAllButtonText(btnToggle);
             Toast.makeText(MainActivity.this, isChecked ? "Feature enabled - Restart Camera to apply" : "Feature disabled - Restart Camera to apply", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void saveToSettings() {
-        try {
-            String cmd = "settings put global cameratools_4k60 " + (sw4k60.isChecked() ? "1" : "0") + " ; " +
-                    "settings put global cameratools_bitrate " + (swBitrate.isChecked() ? "1" : "0") + " ; " +
-                    "settings put global cameratools_raw " + (swRaw.isChecked() ? "1" : "0") + " ; " +
-                    "settings put global cameratools_leica " + (swLeica.isChecked() ? "1" : "0") + " ; " +
-                    "settings put global cameratools_dual " + (swDualVideo.isChecked() ? "1" : "0") + " ; " +
-                    "settings put global cameratools_shutter " + (swShutter.isChecked() ? "1" : "0") + " ; " +
-                    "settings put global cameratools_thermal " + (swThermal.isChecked() ? "1" : "0") + " ; " +
-                    "settings put global cameratools_high_res " + (swHighResPhoto.isChecked() ? "1" : "0");
-            Runtime.getRuntime().exec(new String[]{"su", "-c", cmd});
-        } catch (Throwable ignored) {}
-    }
+
 
     private void setAll(boolean state) {
         sw4k60.setChecked(state);
@@ -184,22 +208,23 @@ public class MainActivity extends Activity {
             .putBoolean(PrefProvider.KEY_DISABLE_THERMAL, state)
             .putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, state)
             .commit();
-        saveToSettings();
-        Toast.makeText(this, state ? "All features activated" : "All features deactivated", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, state ? "All features activated" : "All features deactivated", Toast.LENGTH_SHORT).show();
     }
 
     private void restartCamera(final Button btnRestart) {
         new Thread(new Runnable() {
             @Override
             public void run() {
+                boolean success = false;
                 try {
                     Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "am force-stop com.android.camera"});
                     p.waitFor();
-                } catch (Exception e) {
-                    try {
-                        Runtime.getRuntime().exec("am force-stop com.android.camera");
-                    } catch (Exception ignored) {}
-                }
+                    if (p.exitValue() == 0) {
+                        success = true;
+                    }
+                } catch (Exception ignored) {}
+                
+                final boolean rootSuccess = success;
                 try { Thread.sleep(600); } catch (InterruptedException ignored) {}
                 runOnUiThread(new Runnable() {
                     @Override
@@ -208,10 +233,24 @@ public class MainActivity extends Activity {
                             btnRestart.setEnabled(true);
                             btnRestart.setText(R.string.btn_restart_camera);
                         }
-                        Toast.makeText(MainActivity.this, "Camera restarted!", Toast.LENGTH_SHORT).show();
+                        if (rootSuccess) {
+                            android.widget.Toast.makeText(MainActivity.this, "Camera restarted!", android.widget.Toast.LENGTH_SHORT).show();
+                        } else {
+                            android.widget.Toast.makeText(MainActivity.this, "Root denied! Please Force Stop the Camera app manually.", android.widget.Toast.LENGTH_LONG).show();
+                            try {
+                                android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                intent.setData(android.net.Uri.parse("package:com.android.camera"));
+                                startActivity(intent);
+                            } catch (Exception ignored) {}
+                        }
                     }
                 });
             }
         }).start();
     }
 }
+
+
+
+
+
