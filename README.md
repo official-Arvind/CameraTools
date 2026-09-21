@@ -1,8 +1,4 @@
-<h1 align="center">
-  <picture>
-    <img src="assets/logo.svg" alt="CameraTools">
-  </picture>
-</h1>
+<h1 align="center"><img src="https://raw.githubusercontent.com/official-Arvind/CameraTools/main/assets/logo.svg" alt="CameraTools"></h1>
 
 <p align="center">
   A powerful but simple Xposed module that unlocks hidden camera features on the Xiaomi Redmi Note 12 Pro 5G (ruby).
@@ -57,4 +53,5 @@ If a feature fails to hook or crashes your camera, please create a [GitHub issue
 ## License
 
 [![GPL-3.0-only](https://img.shields.io/badge/LICENSE-GPL--3.0--only-%23A42E2B?style=for-the-badge&logo=gnu&logoColor=white&logoPosition=right)](LICENSE)
+
 
