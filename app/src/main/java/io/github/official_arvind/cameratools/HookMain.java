@@ -928,6 +928,36 @@ public class HookMain implements IXposedHookLoadPackage {
                 }
             });
 
+            // Spoof CameraSettings for MiCamera2 to enable backend remosaic vendor tags,
+            // while keeping UI oblivious so AI/HDR buttons stay enabled!
+            Class<?> cameraSettings = XposedHelpers.findClass("com.android.camera.CameraSettings", lpparam.classLoader);
+            XC_MethodHook spoofBackendHook = new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    if (!enableHighResPhoto) return;
+                    
+                    boolean originalResult = false;
+                    if (param.getResult() != null) {
+                        originalResult = (boolean) param.getResult();
+                    }
+                    if (originalResult) return; // Already true, do nothing
+                    
+                    StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+                    for (StackTraceElement element : stack) {
+                        String className = element.getClassName();
+                        // If the call originated from the camera2 backend, spoof true!
+                        if (className.startsWith("com.android.camera2.") || 
+                            className.startsWith("android.hardware.camera2")) {
+                            param.setResult(true);
+                            return;
+                        }
+                    }
+                }
+            };
+            XposedBridge.hookAllMethods(cameraSettings, "isUltraPixelOn", spoofBackendHook);
+            XposedBridge.hookAllMethods(cameraSettings, "isUltraPixelRearOn", spoofBackendHook);
+            XposedBridge.log("[" + TAG + "] CameraSettings backend spoof hooked!");
+
 
             XC_MethodHook sizeListHook = new XC_MethodHook() {
                 @Override
@@ -985,5 +1015,6 @@ public class HookMain implements IXposedHookLoadPackage {
         }
     }
 }
+
 
 
