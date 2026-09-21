@@ -45,12 +45,6 @@
             android:authorities="io.github.official_arvind.cameratools.prefs"
             android:exported="true"
             android:grantUriPermissions="true" />
-
-        <provider
-            android:name=".PrefProvider"
-            android:authorities="io.github.official_arvind.cameratools.prefs"
-            android:exported="true"
-            android:grantUriPermissions="true" />
     </application>
 
 </manifest>

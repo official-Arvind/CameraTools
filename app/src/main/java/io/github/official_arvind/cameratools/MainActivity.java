@@ -102,7 +102,8 @@ public class MainActivity extends Activity {
         if (!prefs.contains(PrefProvider.KEY_HIGH_RES_PHOTO)) { edInit.putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, false); changed = true; }
         if (changed) {
             edInit.commit();
-                    }
+        }
+        makePrefsWorldReadable();
 
         loadPreferences();
         setupListeners();
@@ -188,12 +189,69 @@ public class MainActivity extends Activity {
             else if (id == R.id.switch_thermal) ed.putBoolean(PrefProvider.KEY_DISABLE_THERMAL, isChecked);
             else if (id == R.id.switch_high_res_photo) ed.putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, isChecked);
             ed.commit();
-                        updateToggleAllButtonText(btnToggle);
+            makePrefsWorldReadable();
+            updateToggleAllButtonText(btnToggle);
             Toast.makeText(MainActivity.this, isChecked ? "Feature enabled - Restart Camera to apply" : "Feature disabled - Restart Camera to apply", Toast.LENGTH_SHORT).show();
         }
     }
 
+    private void makePrefsWorldReadable() {
+        try {
+            Context deCtx = isDeviceProtectedStorage() ? this : createDeviceProtectedStorageContext();
+            java.io.File deDir = deCtx.getDataDir();
+            if (deDir != null) {
+                deDir.setReadable(true, false);
+                deDir.setExecutable(true, false);
+                java.io.File spDir = new java.io.File(deDir, "shared_prefs");
+                if (spDir.exists()) {
+                    spDir.setReadable(true, false);
+                    spDir.setExecutable(true, false);
+                    java.io.File f = new java.io.File(spDir, PrefProvider.PREFS_NAME + ".xml");
+                    if (f.exists()) f.setReadable(true, false);
+                }
+            }
 
+            // Also mirror to standard private storage
+            SharedPreferences normalSp = getSharedPreferences(PrefProvider.PREFS_NAME, Context.MODE_PRIVATE);
+            SharedPreferences.Editor normalEd = normalSp.edit();
+            for (java.util.Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+                if (entry.getValue() instanceof Boolean) {
+                    normalEd.putBoolean(entry.getKey(), (Boolean) entry.getValue());
+                }
+            }
+            normalEd.commit();
+
+            java.io.File normalFiles = getFilesDir();
+            if (normalFiles != null) {
+                java.io.File normalDir = normalFiles.getParentFile();
+                if (normalDir != null) {
+                    normalDir.setReadable(true, false);
+                    normalDir.setExecutable(true, false);
+                    java.io.File normalSpDir = new java.io.File(normalDir, "shared_prefs");
+                    if (normalSpDir.exists()) {
+                        normalSpDir.setReadable(true, false);
+                        normalSpDir.setExecutable(true, false);
+                        java.io.File f = new java.io.File(normalSpDir, PrefProvider.PREFS_NAME + ".xml");
+                        if (f.exists()) f.setReadable(true, false);
+                    }
+                }
+            }
+
+            // Attempt silent background sync to camera target dir if root available
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Process p = Runtime.getRuntime().exec(new String[]{
+                            "su", "-c",
+                            "mkdir -p /data/data/com.android.camera/shared_prefs && cp /data/user_de/0/io.github.official_arvind.cameratools/shared_prefs/io.github.official_arvind.cameratools_preferences.xml /data/data/com.android.camera/shared_prefs/cameratools_prefs.xml && chmod 666 /data/data/com.android.camera/shared_prefs/cameratools_prefs.xml"
+                        });
+                        p.waitFor();
+                    } catch (Throwable ignored) {}
+                }
+            }).start();
+        } catch (Throwable ignored) {}
+    }
 
     private void setAll(boolean state) {
         sw4k60.setChecked(state);
@@ -214,7 +272,8 @@ public class MainActivity extends Activity {
             .putBoolean(PrefProvider.KEY_DISABLE_THERMAL, state)
             .putBoolean(PrefProvider.KEY_HIGH_RES_PHOTO, state)
             .commit();
-                Toast.makeText(this, state ? "All features activated" : "All features deactivated", Toast.LENGTH_SHORT).show();
+        makePrefsWorldReadable();
+        Toast.makeText(this, state ? "All features activated" : "All features deactivated", Toast.LENGTH_SHORT).show();
     }
 
     private void restartCamera(final Button btnRestart) {
