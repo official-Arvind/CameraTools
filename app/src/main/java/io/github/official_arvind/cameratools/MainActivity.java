@@ -243,7 +243,7 @@ public class MainActivity extends Activity {
                 public void run() {
                     try {
                         Process p = Runtime.getRuntime().exec(new String[]{
-                            "su", "-c",
+                            "/system/bin/su", "-c",
                             "mkdir -p /data/data/com.android.camera/shared_prefs && cp /data/user_de/0/io.github.official_arvind.cameratools/shared_prefs/io.github.official_arvind.cameratools_preferences.xml /data/data/com.android.camera/shared_prefs/cameratools_prefs.xml && chmod 666 /data/data/com.android.camera/shared_prefs/cameratools_prefs.xml"
                         });
                         p.waitFor();
