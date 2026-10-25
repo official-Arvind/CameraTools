@@ -70,6 +70,9 @@ public class HookMain implements IXposedHookLoadPackage {
         // PrefProvider IPC sync hook
         hookContextReload(lpparam);
 
+        // AOSP / Custom ROM Missing Resources & FragmentTopConfig Crash Guard
+        hookAospResourceFixes(lpparam);
+
         // 1. 4K 60FPS Video Recording Hooks
         hook4K60FPS(lpparam);
 
@@ -315,6 +318,124 @@ public class HookMain implements IXposedHookLoadPackage {
             });
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook Activity.onResume failed: " + t.getMessage());
+        }
+    }
+
+    // ==========================================
+    // AOSP / Custom ROM Missing Resources & FragmentTopConfig Crash Guard
+    // Resolves Resources$NotFoundException on AOSP ports (e.g. Evolution X)
+    // for missing vendor string IDs (such as 0x7f130379 for Leica Vibrant & 0x7f130378 for Leica Authentic)
+    // and guards FragmentTopConfig top bar initialization.
+    // ==========================================
+    private void hookAospResourceFixes(final XC_LoadPackage.LoadPackageParam lpparam) {
+        // 1. Hook android.content.res.Resources (getText & getString)
+        try {
+            Class<?> resourcesClass = XposedHelpers.findClassIfExists("android.content.res.Resources", lpparam.classLoader);
+            if (resourcesClass == null) {
+                resourcesClass = android.content.res.Resources.class;
+            }
+
+            XC_MethodHook resourceStringHook = new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                    if (param.args.length > 0 && param.args[0] instanceof Integer) {
+                        int id = (Integer) param.args[0];
+                        switch (id) {
+                            case 0x7f130379:
+                                param.setResult("Leica Vibrant");
+                                break;
+                            case 0x7f130378:
+                                param.setResult("Leica Authentic");
+                                break;
+                            case 0x7f13036c:
+                                param.setResult("Leica");
+                                break;
+                            case 0x7f13036b:
+                                param.setResult("LEICA");
+                                break;
+                        }
+                    }
+                }
+
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    if (param.hasThrowable() && param.getThrowable() instanceof android.content.res.Resources.NotFoundException) {
+                        if (param.args.length > 1 && param.args[1] instanceof CharSequence) {
+                            param.setResult(param.args[1]);
+                        } else {
+                            param.setResult("");
+                        }
+                    }
+                }
+            };
+
+            XposedBridge.hookAllMethods(resourcesClass, "getText", resourceStringHook);
+            XposedBridge.hookAllMethods(resourcesClass, "getString", resourceStringHook);
+            XposedBridge.log("[" + TAG + "] Resources string missing ID & Leica fallback hooks installed");
+        } catch (Throwable t) {
+            XposedBridge.log("[" + TAG + "] Hook Resources string failed: " + t.getMessage());
+        }
+
+        // 2. Hook androidx.fragment.app.Fragment.getString
+        try {
+            Class<?> fragmentClass = XposedHelpers.findClassIfExists("androidx.fragment.app.Fragment", lpparam.classLoader);
+            if (fragmentClass != null) {
+                XposedBridge.hookAllMethods(fragmentClass, "getString", new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        if (param.args.length > 0 && param.args[0] instanceof Integer) {
+                            int id = (Integer) param.args[0];
+                            switch (id) {
+                                case 0x7f130379:
+                                    param.setResult("Leica Vibrant");
+                                    break;
+                                case 0x7f130378:
+                                    param.setResult("Leica Authentic");
+                                    break;
+                                case 0x7f13036c:
+                                    param.setResult("Leica");
+                                    break;
+                                case 0x7f13036b:
+                                    param.setResult("LEICA");
+                                    break;
+                            }
+                        }
+                    }
+
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        if (param.hasThrowable() && param.getThrowable() instanceof android.content.res.Resources.NotFoundException) {
+                            XposedBridge.log("[" + TAG + "] Handled missing string in Fragment.getString for ID: 0x" + Integer.toHexString((Integer) param.args[0]));
+                            param.setResult("");
+                        }
+                    }
+                });
+                XposedBridge.log("[" + TAG + "] Fragment.getString missing ID hooks installed");
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("[" + TAG + "] Hook Fragment.getString failed: " + t.getMessage());
+        }
+
+        // 3. Crash Guard on com.android.camera.fragment.top.FragmentTopConfig
+        try {
+            Class<?> topConfigClass = XposedHelpers.findClassIfExists("com.android.camera.fragment.top.FragmentTopConfig", lpparam.classLoader);
+            if (topConfigClass != null) {
+                XC_MethodHook safeFragmentHook = new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        if (param.hasThrowable()) {
+                            XposedBridge.log("[" + TAG + "] Caught and suppressed crash in FragmentTopConfig." + param.method.getName() + ": " + param.getThrowable());
+                            param.setResult(null);
+                        }
+                    }
+                };
+                XposedBridge.hookAllMethods(topConfigClass, "setTopImageResource", safeFragmentHook);
+                XposedBridge.hookAllMethods(topConfigClass, "provideAnimateElement", safeFragmentHook);
+                XposedBridge.hookAllMethods(topConfigClass, "initView", safeFragmentHook);
+                XposedBridge.log("[" + TAG + "] FragmentTopConfig crash guard hooks installed");
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("[" + TAG + "] Hook FragmentTopConfig crash guard failed: " + t.getMessage());
         }
     }
 
@@ -593,7 +714,7 @@ public class HookMain implements IXposedHookLoadPackage {
     }
 
     // ==========================================
-    // 3. 50MP Full Bayer RAW Capture
+    // 3. Pro RAW Bayer Capture (Native 12.5MP Bayer stream - Hardware/HAL limit for MT6877)
     // ==========================================
     private void hookRaw50MP(final XC_LoadPackage.LoadPackageParam lpparam) {
         try {
@@ -759,8 +880,8 @@ public class HookMain implements IXposedHookLoadPackage {
                                     }
                                     Class<?> cdiClass = XposedHelpers.findClass("com.android.camera.data.data.ComponentDataItem", lpparam.classLoader);
                                     java.lang.reflect.Constructor<?> ctor = cdiClass.getConstructor(int.class, int.class, int.class, int.class, String.class);
-                                    items.add(ctor.newInstance(0x7f080414, 0x7f080416, 0x7f080414, 0x7f130379, "0")); // Leica Authentic
-                                    items.add(ctor.newInstance(0x7f080413, 0x7f080415, 0x7f080413, 0x7f130378, "1")); // Leica Vibrant
+                                    items.add(ctor.newInstance(0x7f080414, 0x7f080416, 0x7f080414, 0x7f130379, "0")); // Leica Vibrant
+                                    items.add(ctor.newInstance(0x7f080413, 0x7f080415, 0x7f080413, 0x7f130378, "1")); // Leica Authentic
                                 }
                             } catch (Throwable ignored) {}
                         }
@@ -781,10 +902,33 @@ public class HookMain implements IXposedHookLoadPackage {
                 XposedBridge.hookAllMethods(capsClass, "isSupportCvWatermark", trueHook);
             }
 
-            // 6. Hook CameraSettings for CV Watermark
+            // 6. Hook CameraSettings for CV Watermark & true Leica profile resolution (0 = Vibrant, 1 = Authentic)
             Class<?> cameraSettings = XposedHelpers.findClassIfExists("com.android.camera.CameraSettings", lpparam.classLoader);
             if (cameraSettings != null) {
                 XposedBridge.hookAllMethods(cameraSettings, "isSupportCvWatermark", trueHook);
+                try {
+                    XposedHelpers.findAndHookMethod(cameraSettings, "getCvType", new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (!enableLeica) return;
+                            try {
+                                Class<?> dr = XposedHelpers.findClassIfExists("com.android.camera.data.DataRepository", lpparam.classLoader);
+                                if (dr != null) {
+                                    Object config = XposedHelpers.callStaticMethod(dr, "dataItemConfig");
+                                    if (config != null) {
+                                        Object compCv = XposedHelpers.callMethod(config, "getComponentConfigCvType");
+                                        if (compCv != null) {
+                                            String val = (String) XposedHelpers.callMethod(compCv, "getComponentValue", 160);
+                                            if (val != null) {
+                                                param.setResult(Integer.parseInt(val));
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (Throwable ignored) {}
+                        }
+                    });
+                } catch (Throwable ignored) {}
             }
 
             // 7. Hook CVWatermark / ICvWatermark
@@ -832,14 +976,16 @@ public class HookMain implements IXposedHookLoadPackage {
 
             // 2. DataItemFeature.o00o0ooo() -> The underlying DEX method DualCamModuleEntry calls
             try {
-                Class<?> dataItemFeature = XposedHelpers.findClass("o000Oo0.OooO00o", lpparam.classLoader);
-                XposedBridge.hookAllMethods(dataItemFeature, "o00o0ooo", trueHook);
-                XposedBridge.log("[" + TAG + "] DataItemFeature.o00o0ooo() hooked -> true");
+                Class<?> dataItemFeature = XposedHelpers.findClassIfExists("o000Oo0.OooO00o", lpparam.classLoader);
+                if (dataItemFeature != null) {
+                    XposedBridge.hookAllMethods(dataItemFeature, "o00o0ooo", trueHook);
+                    XposedBridge.log("[" + TAG + "] DataItemFeature.o00o0ooo() hooked -> true");
 
-                // 2b. o000ooo() -> Camera opening order: MUST return true so MAIN_SOURCE (Back Camera 0)
-                // opens FIRST as master before SUB_SOURCE (Front Camera 1)
-                XposedBridge.hookAllMethods(dataItemFeature, "o000ooo", trueHook);
-                XposedBridge.log("[" + TAG + "] DataItemFeature.o000ooo() hooked -> true (Back Camera 0 opens first)");
+                    // 2b. o000ooo() -> Camera opening order: MUST return true so MAIN_SOURCE (Back Camera 0)
+                    // opens FIRST as master before SUB_SOURCE (Front Camera 1)
+                    XposedBridge.hookAllMethods(dataItemFeature, "o000ooo", trueHook);
+                    XposedBridge.log("[" + TAG + "] DataItemFeature.o000ooo() hooked -> true (Back Camera 0 opens first)");
+                }
             } catch (Throwable t) {
                 XposedBridge.log("[" + TAG + "] Hook DataItemFeature failed: " + t.getMessage());
             }
@@ -1110,8 +1256,12 @@ public class HookMain implements IXposedHookLoadPackage {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                     if (!enableShutter) return;
-                    // 62.5 microseconds (1/16000s) to 60,000,000,000 nanoseconds (60s)
-                    param.setResult(new Range<Long>(62500L, 60000000000L));
+                    int mode = getCurrentCameraMode(lpparam.classLoader);
+                    // Shutter speed manual slider is strictly for Pro Photo (167) and Pro Video (180)
+                    if (mode == 167 || mode == 180) {
+                        // 62.5 microseconds (1/16000s) to 60,000,000,000 nanoseconds (60s)
+                        param.setResult(new Range<Long>(62500L, 60000000000L));
+                    }
                 }
             };
 
@@ -1528,6 +1678,12 @@ public class HookMain implements IXposedHookLoadPackage {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 if (!enableLogFormat) return;
+                int mode = getCurrentCameraMode(lpparam.classLoader);
+                // Video LOG is strictly for Pro Video (180) and Normal Video (162)
+                if (mode != 180 && mode != 162) {
+                    param.setResult(false);
+                    return;
+                }
                 param.setResult(true);
             }
         };
@@ -1541,7 +1697,7 @@ public class HookMain implements IXposedHookLoadPackage {
             if (capsClass != null) {
                 try { XposedBridge.hookAllMethods(capsClass, "isSupportedVideoLogFormat", logHook); } catch (Throwable ignored) {}
             }
-            XposedBridge.log("[" + TAG + "] Pro Video LOG profile hooks installed");
+            XposedBridge.log("[" + TAG + "] Pro Video LOG profile hooks installed with mode guards");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook VideoLog failed: " + t.getMessage());
         }
@@ -1555,6 +1711,14 @@ public class HookMain implements IXposedHookLoadPackage {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 if (!enableMiMovie) return;
+                int mode = getCurrentCameraMode(lpparam.classLoader);
+                // STRICT MODE GUARD:
+                // Only allow MiMovie in standard video and photo modes (162, 180, 169, 176, 163, 167).
+                // STRICTLY BLOCK in Portrait (171), Night (173), Panorama (166), Slow Motion (168, 172), Document (186).
+                if (mode == 171 || mode == 173 || mode == 166 || mode == 168 || mode == 172 || mode == 186) {
+                    param.setResult(false);
+                    return;
+                }
                 param.setResult(true);
             }
         };
@@ -1570,7 +1734,7 @@ public class HookMain implements IXposedHookLoadPackage {
                 try { XposedBridge.hookAllMethods(capsClass, "isSupportedVideoMiMovie", movieHook); } catch (Throwable ignored) {}
                 try { XposedBridge.hookAllMethods(capsClass, "isSupportedCinematicVideo", movieHook); } catch (Throwable ignored) {}
             }
-            XposedBridge.log("[" + TAG + "] Cinematic MiMovie (2.39:1) hooks installed");
+            XposedBridge.log("[" + TAG + "] Cinematic MiMovie (2.39:1) hooks installed with strict mode guards");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook MiMovie failed: " + t.getMessage());
         }
@@ -1619,6 +1783,12 @@ public class HookMain implements IXposedHookLoadPackage {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 if (!enableFocusPeak) return;
+                int mode = getCurrentCameraMode(lpparam.classLoader);
+                // Peaking and exposure zebra are manual assists for Pro Photo (167) and Pro Video (180)
+                if (mode != 167 && mode != 180) {
+                    param.setResult(false);
+                    return;
+                }
                 param.setResult(true);
             }
         };
@@ -1639,15 +1809,17 @@ public class HookMain implements IXposedHookLoadPackage {
             Class<?> utilClass = XposedHelpers.findClassIfExists("com.android.camera2.CameraCapabilitiesUtil", lpparam.classLoader);
             if (utilClass != null) {
                 try { XposedBridge.hookAllMethods(utilClass, "isSupportDepthFocusForMTK", peakHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(utilClass, "isSupportFocusPeak", peakHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(utilClass, "isSupportExposureFeedback", peakHook); } catch (Throwable ignored) {}
             }
             Class<?> capsClass = XposedHelpers.findClassIfExists("com.android.camera2.CameraCapabilities", lpparam.classLoader);
             if (capsClass != null) {
                 try { XposedBridge.hookAllMethods(capsClass, "isSupportDepthFocusForMTK", peakHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(capsClass, "isSupportFocusPeak", peakHook); } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(capsClass, "isSupportExposureFeedback", peakHook); } catch (Throwable ignored) {}
             }
-            Class<?> csClass = XposedHelpers.findClassIfExists("com.android.camera.CameraSettings", lpparam.classLoader);
-            if (csClass != null) {
-                try { XposedBridge.hookAllMethods(csClass, "isTeleX", peakHook); } catch (Throwable ignored) {}
-            }
+            // CRITICAL: DO NOT hook CameraSettings.isTeleX! 
+            // isTeleX disables AI Audio Zoom and was conflicting with audio features.
             XposedBridge.log("[" + TAG + "] Focus Peaking & Zebra Stripes hooks installed");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook FocusPeakingZebra failed: " + t.getMessage());
@@ -1764,10 +1936,133 @@ public class HookMain implements IXposedHookLoadPackage {
         };
 
         try {
-            Class<?> dataItemFeature = XposedHelpers.findClassIfExists("o000Oo0.OooO00o", lpparam.classLoader);
-            if (dataItemFeature != null) {
-                try { XposedBridge.hookAllMethods(dataItemFeature, "o00o0000", audioHook); } catch (Throwable ignored) {}
+            // 1. Hook AiAudioParameterManager (the foundational capability provider for Audio Zoom on MIUI)
+            Class<?> audioManagerClass = XposedHelpers.findClassIfExists("com.android.camera.aiaudio.AiAudioParameterManager", lpparam.classLoader);
+            if (audioManagerClass != null) {
+                try {
+                    java.lang.reflect.Field f = audioManagerClass.getDeclaredField("sSupported");
+                    f.setAccessible(true);
+                    f.set(null, Boolean.TRUE);
+                } catch (Throwable ignored) {}
+                try { XposedBridge.hookAllMethods(audioManagerClass, "isSupportAiAudioNew", audioHook); } catch (Throwable ignored) {}
             }
+
+            // 2. Hook ComponentRunningAiAudioNew (Top menu toggle & state evaluator)
+            Class<?> runningNewClass = XposedHelpers.findClassIfExists("com.android.camera.data.data.runing.ComponentRunningAiAudioNew", lpparam.classLoader);
+            if (runningNewClass != null) {
+                try {
+                    XposedHelpers.findAndHookMethod(runningNewClass, "isSwitchOn", int.class, new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (!enableAudioMic) return;
+                            int mode = (Integer) param.args[0];
+                            if (mode == 162 || mode == 180) { // Video or Pro Video
+                                String val = (String) XposedHelpers.callMethod(param.thisObject, "getComponentValue", mode);
+                                param.setResult("ON".equals(val));
+                            } else {
+                                param.setResult(false);
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+
+                try {
+                    XposedHelpers.findAndHookMethod(runningNewClass, "setEnabled", int.class, boolean.class, new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (!enableAudioMic) return;
+                            int mode = (Integer) param.args[0];
+                            boolean enabled = (Boolean) param.args[1];
+                            if (mode == 162 || mode == 180) {
+                                XposedHelpers.callMethod(param.thisObject, "setComponentValue", mode, enabled ? "ON" : "OFF");
+                                param.setResult(null);
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+            }
+
+            // 3. Hook ComponentRunningAiAudioSingle
+            Class<?> runningSingleClass = XposedHelpers.findClassIfExists("com.android.camera.data.data.runing.ComponentRunningAiAudioSingle", lpparam.classLoader);
+            if (runningSingleClass != null) {
+                try {
+                    XposedHelpers.findAndHookMethod(runningSingleClass, "isSwitchOn", int.class, new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (!enableAudioMic) return;
+                            int mode = (Integer) param.args[0];
+                            if (mode == 162 || mode == 180) {
+                                String val = (String) XposedHelpers.callMethod(param.thisObject, "getComponentValue", mode);
+                                param.setResult("ON".equals(val));
+                            } else {
+                                param.setResult(false);
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+
+                try {
+                    XposedHelpers.findAndHookMethod(runningSingleClass, "setEnabled", int.class, boolean.class, new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (!enableAudioMic) return;
+                            int mode = (Integer) param.args[0];
+                            boolean enabled = (Boolean) param.args[1];
+                            if (mode == 162 || mode == 180) {
+                                XposedHelpers.callMethod(param.thisObject, "setComponentValue", mode, enabled ? "ON" : "OFF");
+                                param.setResult(null);
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+            }
+
+            // 4. Hook ComponentRunningAiAudio (Extra popup options: normal, audio zoom, 3d record)
+            Class<?> runningAudioClass = XposedHelpers.findClassIfExists("com.android.camera.data.data.runing.ComponentRunningAiAudio", lpparam.classLoader);
+            if (runningAudioClass != null) {
+                try {
+                    XposedHelpers.findAndHookMethod(runningAudioClass, "isEmpty", new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (!enableAudioMic) return;
+                            param.setResult(false);
+                        }
+                    });
+                } catch (Throwable ignored) {}
+            }
+
+            // 5. Hook CameraSettings
+            Class<?> csClass = XposedHelpers.findClassIfExists("com.android.camera.CameraSettings", lpparam.classLoader);
+            if (csClass != null) {
+                try {
+                    XposedHelpers.findAndHookMethod(csClass, "isAiAudioOn", int.class, new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (!enableAudioMic) return;
+                            int mode = (Integer) param.args[0];
+                            if (mode == 162 || mode == 180) {
+                                try {
+                                    Class<?> dr = XposedHelpers.findClassIfExists("com.android.camera.data.DataRepository", lpparam.classLoader);
+                                    if (dr != null) {
+                                        Object running = XposedHelpers.callStaticMethod(dr, "dataItemRunning");
+                                        if (running != null) {
+                                            Object compNew = XposedHelpers.callMethod(running, "getComponentRunningAiAudioNew");
+                                            if (compNew != null) {
+                                                boolean on = (Boolean) XposedHelpers.callMethod(compNew, "isSwitchOn", mode);
+                                                if (on) {
+                                                    param.setResult(true);
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (Throwable ignored) {}
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+            }
+
+            // 6. Hook Common & Ruby device classes
             Class<?> commonClass = XposedHelpers.findClassIfExists("com.mi.device.Common", lpparam.classLoader);
             if (commonClass != null) {
                 try { XposedBridge.hookAllMethods(commonClass, "o00o0000", audioHook); } catch (Throwable ignored) {}
@@ -1776,6 +2071,8 @@ public class HookMain implements IXposedHookLoadPackage {
             if (rubyClass != null) {
                 try { XposedBridge.hookAllMethods(rubyClass, "o00o0000", audioHook); } catch (Throwable ignored) {}
             }
+
+            // 7. Hook CameraCapabilitiesUtil & CameraCapabilities
             Class<?> utilClass = XposedHelpers.findClassIfExists("com.android.camera2.CameraCapabilitiesUtil", lpparam.classLoader);
             if (utilClass != null) {
                 try { XposedBridge.hookAllMethods(utilClass, "isSupport3MicEnable", audioHook); } catch (Throwable ignored) {}
@@ -1785,10 +2082,6 @@ public class HookMain implements IXposedHookLoadPackage {
             if (capsClass != null) {
                 try { XposedBridge.hookAllMethods(capsClass, "isSupport3MicEnable", audioHook); } catch (Throwable ignored) {}
                 try { XposedBridge.hookAllMethods(capsClass, "isSupportBluetoothHeadsetMic", audioHook); } catch (Throwable ignored) {}
-            }
-            Class<?> audioManagerClass = XposedHelpers.findClassIfExists("com.android.camera.aiaudio.AiAudioParameterManager", lpparam.classLoader);
-            if (audioManagerClass != null) {
-                try { XposedBridge.hookAllMethods(audioManagerClass, "isSupportAiAudioNew", audioHook); } catch (Throwable ignored) {}
             }
             XposedBridge.log("[" + TAG + "] Directional Audio Zoom & Bluetooth Headset Mic hooks installed");
         } catch (Throwable t) {

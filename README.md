@@ -135,7 +135,7 @@ We have designed CameraTools specifically to support custom ROMs such as **Linea
 ## ⚠️ Disclaimer & Safety
 
 * **Hardware Heat**: Bypassing thermal shutdown limits during extended 4K60 video recording or high ambient temperatures will cause the device to heat up. Use common sense and avoid leaving recording unattended in direct sunlight.
-* **Camera Sensor Support**: 50MP RAW and 50MP Normal Photo modes utilize the full sensor layout of the primary Sony IMX766. These modes are strictly bound to Camera ID 0 (rear main lens); the ultra-wide and front cameras will continue to operate at their respective native resolutions without crashing.
+* **Camera Sensor Support**: Pro RAW (12.5MP native Bayer stream) and 50MP Normal Photo modes utilize the primary Sony IMX766 sensor. On the Dimensity 1080 (ruby), the MediaTek Camera HAL exposes RAW at the native 12.5MP 4-in-1 binned Bayer resolution (50MP is handled via ISP hardware remosaic for JPEG). These modes are strictly bound to Camera ID 0 (rear main lens); the ultra-wide and front cameras continue to operate at their respective native resolutions.
 
 ---
 

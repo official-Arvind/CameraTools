@@ -92,7 +92,7 @@ Below is the categorized catalog of all unlockable features. **Arvind Ji, please
 | **S1** | **Hardware Thermal Warning Bypass** | `ThermalDetector`, `PowerManager.getCurrentThermalStatus` | Prevents the camera app from showing high-temperature popups, blocking 4K60, or killing video recording. | ✅ **Already Implemented** |
 | **S2** | **Dual-Camera Concurrent Stream (Director Mode 204)** | `DualCamModuleEntry`, MTK PIP vendor tags | Simultaneous recording with front and rear cameras in split-screen or picture-in-picture. | ✅ **Already Implemented** |
 | **S3** | **50MP Normal Photo Mode** | `alwaysUseRemosaicSize`, `sizeListHook` | Captures 8192×6144 resolution in standard Photo mode with MediaTek hardware ISP remosaicing (now protected against Portrait green tint). | ✅ **Already Implemented** |
-| **S4** | **50MP Bayer RAW Output (DNG)** | `getCustomManualPictureSize`, `isUltraPixelRawOn` | Full-sensor uncompressed 50MP RAW in Pro mode (now fixed from 12.6MP binning). | ✅ **Already Implemented** |
+| **S4** | **Pro RAW Bayer Output (DNG)** | `isSupportRaw`, `isUltraPixelRawOn` | Uncompressed 12.5MP native Bayer RAW (DNG) in Pro mode (Hardware/HAL maximum for IMX766 on MT6877). | ✅ **Already Implemented** |
 
 ---
 
