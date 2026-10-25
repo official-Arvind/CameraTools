@@ -24,6 +24,9 @@ jobs:
     env:
       TAG_NAME: ${{ inputs.tag || github.event.release.tag_name || github.ref_name }}
     steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
       - name: Validate tag
         run: |
           if [[ ! "$TAG_NAME" =~ ^v ]] && [[ ! "$TAG_NAME" =~ ^[0-9] ]]; then
@@ -80,10 +83,6 @@ jobs:
           fi
           echo "Xposed release tag: $XPOSED_TAG"
           echo "XPOSED_TAG=$XPOSED_TAG" >> "$GITHUB_ENV"
-
-      - name: Checkout source repository
-        if: steps.release.outputs.name != ''
-        uses: actions/checkout@v4
 
       - name: Sync metadata and README to Xposed repo
         if: steps.release.outputs.name != ''
