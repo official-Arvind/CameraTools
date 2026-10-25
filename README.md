@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/official-Arvind/CameraTools/releases/tag/v1.3.1"><img src="https://img.shields.io/badge/Release-v1.3.1-blue?style=for-the-badge&logo=github" alt="v1.3.1"></a>
+  <a href="https://github.com/official-Arvind/CameraTools/releases/tag/v1.3.2"><img src="https://img.shields.io/badge/Release-v1.3.2-blue?style=for-the-badge&logo=github" alt="v1.3.2"></a>
   <img src="https://img.shields.io/badge/Android-13%20%7C%2014%20(MIUI%20%2F%20HyperOS%20%2F%20AOSP)-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 13/14">
   <img src="https://img.shields.io/badge/Root-Optional%20(Recommended)-green?style=for-the-badge&logo=superuser" alt="Root Optional">
   <img src="https://img.shields.io/badge/Xposed-API_93%2B%20(LSPosed%20%2F%20Vector)-ff69b4?style=for-the-badge" alt="Xposed API 93+">
@@ -85,7 +85,7 @@ We have designed CameraTools specifically to support custom ROMs such as **Linea
 ### How to Test on AOSP:
 
 1. **Install Module**:
-   * Download and install the latest `v1.3.1` APK from [Releases](https://github.com/official-Arvind/CameraTools/releases).
+   * Download and install the latest `v1.3.2` APK from [Releases](https://github.com/official-Arvind/CameraTools/releases).
 2. **Grant Superuser (Root) Permissions**:
    * Open the **CameraTools** app. When prompted by Magisk, KernelSU, or APatch, tap **Grant** (Always Allow) so the app can sync settings directly to target camera data directories and execute quick camera restarts.
 3. **Enable in LSPosed / Vector**:
@@ -124,7 +124,7 @@ We have designed CameraTools specifically to support custom ROMs such as **Linea
    * Root: **Magisk**, **KernelSU**, or **APatch** (Superuser permissions granted to CameraTools)
    * Framework: **LSPosed (Zygisk)** or **Vector** installed and active
 2. **Setup Steps**:
-   * Install `io.github.official_arvind.cameratools-v1.3.1.apk`.
+   * Install `io.github.official_arvind.cameratools-v1.3.2.apk`.
    * Open **CameraTools** and grant root permission.
    * Activate module in LSPosed / Vector and select camera app(s) in scope.
    * Reboot device or restart zygote.

@@ -4,6 +4,42 @@ All notable changes to the **CameraTools** project are documented in this file.
 
 ---
 
+## [v1.3.2] - 2026-10-25 (AOSP Crash Fix, Leica True Tuning & Feature Polish)
+
+### 🐛 Critical Bug Fixes & System Stability
+* **AOSP ROM Missing Resource Crash Fix (Issue #7)**:
+  * Resolved fatal `android.content.res.Resources$NotFoundException: String resource ID #0x7f130379` when opening Camera Settings on Evolution X, LineageOS, crDroid, and other custom AOSP ROMs lacking MIUI framework resource overlays.
+  * Implemented resilient dynamic fallback mapping in `hookAospResourceFixes`: safely intercepts `Resources.getString(int)` and `getText(int)` for missing Leica string IDs (such as `0x7f130379` -> `"Leica"`), ensuring camera settings opens seamlessly on any custom ROM without crashing.
+
+### 🎙️ Audio Subsystem Polish & State Synchronization
+* **Audio Zoom Toggle & Active Indicator Glow Fix**:
+  * Resolved issue where tapping the Directional Audio Zoom button in camera UI failed to toggle state or display active visual glow.
+  * Eliminated method collision where `isTeleX` hook in `hookFocusPeakingZebra` was inadvertently intercepting audio zoom feature checks.
+  * Explicitly initialized `AiAudioParameterManager.sSupported = true` via reflection and hooked `ComponentRunningAiAudioNew.isSwitchOn(int mode)` and `ComponentRunningAiAudioNew.getResIcon(boolean isNormal)` so the audio zoom toggle updates cleanly and displays the active yellow glow indicator.
+
+### 🔴 Leica Color Science & Tuning Realism
+* **True Leica Authentic vs. Leica Vibrant Separation**:
+  * Fixed bug where switching between Leica Authentic and Leica Vibrant produced identical images due to `CameraSettings.getCvType()` clamping custom cvType values to `0`.
+  * Hooked `CameraSettings.getCvType()` to return the actual user-selected Leica tuning mode (`1` for Leica Authentic, `2` for Leica Vibrant).
+  * Enables MIUI Camera's GL rendering pipeline to dynamically bind distinct color grading matrices, contrast S-curves, and peripheral vignette shaders for authentic Leica character.
+
+### 🛡️ Strict Mode Conflict Isolation & Guard Architecture
+* **Movie Frame (MiMovie 2.39:1) Isolation**:
+  * Strictly prevented 2.39:1 anamorphic crop from injecting into incompatible modes: blocked in Portrait (171), Night (173), Panorama (166), Slow Motion (168/172), and Document (186) modes. Eliminates sensor aspect ratio stretching, crop distortion, and preview freezes.
+* **50MP Normal Photo Guarding**:
+  * Strictly isolated 50MP hardware remosaicing to standard Photo mode (163) on Camera ID `0` (main rear sensor), completely preventing bokeh depth corruption or green tinting in Portrait mode.
+* **Pro Shutter & Video LOG Mode Isolation**:
+  * Confined extended shutter speed (up to 60s) strictly to Pro Photo (167) and Pro Video (180).
+  * Confined flat LOG color profile strictly to Pro Video (180).
+
+### 🎞️ Pro RAW Bayer Sensor Hardware Documentation
+* **Dual-File Capture Architecture**:
+  * Clarified why shooting RAW in Pro mode produces two files: a `.jpg` (ISP-processed preview with color tuning) and a `.dng` (uncompressed raw sensor data with full dynamic range) per the Android Camera2 specification.
+* **12.5MP Native Quad-Bayer Readout**:
+  * Documented that on the MediaTek Dimensity 1080 (MT6877 / Sony IMX766), the MediaTek Camera HAL exposes RAW at the native 12.5MP 4-in-1 binned Bayer resolution (`RAW_SENSOR` 32). Recommended Adobe Lightroom / Photoshop with custom color profiles for optimal DNG post-processing.
+
+---
+
 ## [v1.3.1] - 2026-10-22 (Security & Code Quality Release)
 
 ### 🛡️ Code Scanning, Security & Code Quality Hardening
