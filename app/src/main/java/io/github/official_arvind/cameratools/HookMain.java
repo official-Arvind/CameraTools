@@ -220,7 +220,8 @@ public class HookMain implements IXposedHookLoadPackage {
     }
 
     private void reloadAllPreferences(Context ctx) {
-        // Try LSPosed reload
+        boolean loaded = false;
+        // Tier 1: Try LSPosed reload
         try {
             if (xsp != null) {
                 xsp.reload();
@@ -241,15 +242,18 @@ public class HookMain implements IXposedHookLoadPackage {
                     enableTrackFocus = xsp.getBoolean(PrefProvider.KEY_TRACK_FOCUS, xsp.getBoolean(PrefProvider.KEY_LEICA_LENSES, enableTrackFocus));
                     enableDocMode = xsp.getBoolean(PrefProvider.KEY_DOC_MODE, enableDocMode);
                     enableAudioMic = xsp.getBoolean(PrefProvider.KEY_AUDIO_MIC, enableAudioMic);
+                    loaded = true;
                 }
             }
         } catch (Throwable ignored) {}
 
-        // Try direct XML reload
-        reloadPrefsDirect();
+        // Tier 2: Only fallback to direct XML if LSPosed remote preferences did not load
+        if (!loaded) {
+            loaded = reloadPrefsDirect();
+        }
 
-        // Try ContentProvider reload if Context is available
-        if (ctx != null) {
+        // Tier 3: Only fallback to ContentProvider if both Tier 1 & 2 were unavailable
+        if (!loaded && ctx != null) {
             try {
                 android.content.ContentResolver cr = ctx.getContentResolver();
                 if (cr != null) {
@@ -271,12 +275,10 @@ public class HookMain implements IXposedHookLoadPackage {
                         enableTrackFocus = b.getBoolean(PrefProvider.KEY_TRACK_FOCUS, b.getBoolean(PrefProvider.KEY_LEICA_LENSES, enableTrackFocus));
                         enableDocMode = b.getBoolean(PrefProvider.KEY_DOC_MODE, enableDocMode);
                         enableAudioMic = b.getBoolean(PrefProvider.KEY_AUDIO_MIC, enableAudioMic);
-                        XposedBridge.log("[" + TAG + "] Preferences updated via ContentProvider: 4k60=" + enable4k60 + ", 50MP=" + enableHighResPhoto);
+                        XposedBridge.log("[" + TAG + "] Preferences updated via ContentProvider fallback");
                     }
                 }
-            } catch (Throwable cpErr) {
-                XposedBridge.log("[" + TAG + "] ContentProvider sync attempt notice: " + cpErr.getMessage());
-            }
+            } catch (Throwable ignored) {}
         }
     }
 
@@ -652,7 +654,7 @@ public class HookMain implements IXposedHookLoadPackage {
     }
 
     // ==========================================
-    // 2. Cinematic Ultra Bitrate (150 Mbps)
+    // 2. Cinematic Ultra Bitrate (100 Mbps MTK hardware ceiling)
     // ==========================================
     private void hookCinematicBitrate(final XC_LoadPackage.LoadPackageParam lpparam) {
         try {
@@ -667,7 +669,8 @@ public class HookMain implements IXposedHookLoadPackage {
                     } else {
                         map = new HashMap<>();
                     }
-                    map.put("3840x2160:60", 150000000); // 150 Mbps (4K 60)
+                    // MT6877 Dimensity 1080 hardware encoder maximum bitrate is 100 Mbps
+                    map.put("3840x2160:60", 100000000); // 100 Mbps (4K 60)
                     map.put("3840x2160:30", 100000000); // 100 Mbps (4K 30)
                     map.put("1920x1080:60", 60000000);  // 60 Mbps (1080p 60)
                     map.put("1920x1080:30", 40000000);  // 40 Mbps (1080p 30)
@@ -686,7 +689,7 @@ public class HookMain implements IXposedHookLoadPackage {
                 XposedBridge.hookAllMethods(rubyClass, "o0ooOO0", bitrateHook);
             } catch (Throwable ignored) {}
 
-            XposedBridge.log("[" + TAG + "] Cinematic Bitrate (150 Mbps) hooked");
+            XposedBridge.log("[" + TAG + "] Cinematic Bitrate hooked with hardware safe ceilings");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook Bitrate failed: " + t.getMessage());
         }
@@ -1727,14 +1730,36 @@ public class HookMain implements IXposedHookLoadPackage {
             Class<?> utilClass = XposedHelpers.findClassIfExists("com.android.camera2.CameraCapabilitiesUtil", lpparam.classLoader);
             if (utilClass != null) {
                 try { XposedBridge.hookAllMethods(utilClass, "isSupportedVideoMiMovie", movieHook); } catch (Throwable ignored) {}
-                try { XposedBridge.hookAllMethods(utilClass, "isSupportedCinematicVideo", movieHook); } catch (Throwable ignored) {}
             }
             Class<?> capsClass = XposedHelpers.findClassIfExists("com.android.camera2.CameraCapabilities", lpparam.classLoader);
             if (capsClass != null) {
                 try { XposedBridge.hookAllMethods(capsClass, "isSupportedVideoMiMovie", movieHook); } catch (Throwable ignored) {}
-                try { XposedBridge.hookAllMethods(capsClass, "isSupportedCinematicVideo", movieHook); } catch (Throwable ignored) {}
             }
-            XposedBridge.log("[" + TAG + "] Cinematic MiMovie (2.39:1) hooks installed with strict mode guards");
+
+            // Guard CaptureRequestBuilder.applyCinematicVideo:
+            // Setting CaptureRequestVendorTags.CINEMATIC_VIDEO_ENABLED crashes/freezes preview on MediaTek HAL
+            Class<?> crbClass = XposedHelpers.findClassIfExists("com.android.camera2.CaptureRequestBuilder", lpparam.classLoader);
+            if (crbClass != null) {
+                try {
+                    XposedBridge.hookAllMethods(crbClass, "applyCinematicVideo", new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                            if (param.args.length >= 2 && param.args[1] != null) {
+                                Object caps = param.args[1];
+                                try {
+                                    Method mIsTagDefined = caps.getClass().getMethod("isTagDefined", String.class);
+                                    boolean defined = (Boolean) mIsTagDefined.invoke(caps, "xiaomi.video.cinematic");
+                                    if (!defined) {
+                                        // Vendor tag undefined on MediaTek HAL - suppress to prevent preview freeze
+                                        param.setResult(null);
+                                    }
+                                } catch (Throwable ignored) {}
+                            }
+                        }
+                    });
+                } catch (Throwable ignored) {}
+            }
+            XposedBridge.log("[" + TAG + "] Cinematic MiMovie (2.39:1) hooks installed with strict HAL guards");
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook MiMovie failed: " + t.getMessage());
         }
@@ -2158,10 +2183,14 @@ public class HookMain implements IXposedHookLoadPackage {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                         if (!enableBitrate) return;
-                        param.args[0] = 150000000; // 150 Mbps
+                        if (param.args.length > 0 && param.args[0] instanceof Integer) {
+                            int orig = (Integer) param.args[0];
+                            // Clamp to MT6877 Dimensity 1080 hardware encoder ceiling (100 Mbps)
+                            param.args[0] = Math.min(Math.max(orig, 60000000), 100000000);
+                        }
                     }
                 });
-                XposedBridge.log("[" + TAG + "] MediaRecorder bitrate hook installed");
+                XposedBridge.log("[" + TAG + "] MediaRecorder bitrate hook installed (hardware-safe clamped)");
             }
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Framework MediaRecorder hook failed: " + t.getMessage());
@@ -2198,7 +2227,7 @@ public class HookMain implements IXposedHookLoadPackage {
             XposedBridge.log("[" + TAG + "] Framework CamcorderProfile hook failed: " + t.getMessage());
         }
 
-        // E. StreamConfigurationMap 4K output size injection (enables 4K for front camera on AOSP/HAL)
+        // E. StreamConfigurationMap 4K output size injection (strictly isolated to video recording targets)
         try {
             Class<?> mapClass = XposedHelpers.findClassIfExists("android.hardware.camera2.params.StreamConfigurationMap", lpparam.classLoader);
             if (mapClass != null) {
@@ -2222,26 +2251,27 @@ public class HookMain implements IXposedHookLoadPackage {
                                 if (arg instanceof Class) {
                                     Class<?> c = (Class<?>) arg;
                                     String cName = c.getName();
-                                    if (cName.contains("MediaRecorder") || cName.contains("SurfaceTexture") || cName.contains("ImageReader")) {
-                                        shouldInject = true;
-                                    }
-                                } else if (arg instanceof Integer) {
-                                    int fmt = (Integer) arg;
-                                    if (fmt == 34 /* PRIVATE */ || fmt == 35 /* YUV_420_888 */ || fmt == 256 /* JPEG */) {
+                                    // STRICT ISOLATION:
+                                    // ONLY inject 4K into video recording targets: MediaRecorder or MediaCodec!
+                                    // NEVER inject into SurfaceTexture, SurfaceHolder, or ImageReader!
+                                    // Viewfinder preview stream uses SurfaceTexture and format 34 (PRIVATE).
+                                    // Injecting 4K into preview causes MediaTek MT6877 ISP to stall/freeze viewfinder!
+                                    if (cName.contains("MediaRecorder") || cName.contains("MediaCodec")) {
                                         shouldInject = true;
                                     }
                                 }
+                                // Note: Do NOT inject for integer formats (34 PRIVATE, 35 YUV, etc.) to protect preview surfaces
                                 if (shouldInject) {
                                     android.util.Size[] newSizes = new android.util.Size[sizes.length + 1];
-                                    newSizes[0] = new android.util.Size(3840, 2160);
-                                    System.arraycopy(sizes, 0, newSizes, 1, sizes.length);
+                                    System.arraycopy(sizes, 0, newSizes, 0, sizes.length);
+                                    newSizes[sizes.length] = new android.util.Size(3840, 2160); // Append at end, NEVER prepend at index 0
                                     param.setResult(newSizes);
                                 }
                             }
                         }
                     }
                 });
-                XposedBridge.log("[" + TAG + "] StreamConfigurationMap 4K injection hooked");
+                XposedBridge.log("[" + TAG + "] StreamConfigurationMap 4K injection hooked (strictly isolated to recording surfaces)");
             }
         } catch (Throwable t) {
             XposedBridge.log("[" + TAG + "] Hook StreamConfigurationMap failed: " + t.getMessage());
@@ -2266,8 +2296,8 @@ public class HookMain implements IXposedHookLoadPackage {
                             if ("bitrate".equalsIgnoreCase(name) || "android._bitrate".equalsIgnoreCase(name)) {
                                 int original = (Integer) param.args[1];
                                 if (original > 5000000) { // Only override actual video bitrates (>5Mbps)
-                                    param.args[1] = 150000000; // 150 Mbps
-                                    XposedBridge.log("[" + TAG + "] GCam MediaFormat bitrate overridden: " + original + " -> 150Mbps");
+                                    param.args[1] = 100000000; // 100 Mbps (safe MT6877 Codec2 hardware limit)
+                                    XposedBridge.log("[" + TAG + "] GCam MediaFormat bitrate overridden: " + original + " -> 100Mbps");
                                 }
                             }
                         }

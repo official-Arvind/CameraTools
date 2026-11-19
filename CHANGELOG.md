@@ -4,6 +4,18 @@ All notable changes to the **CameraTools** project are documented in this file.
 
 ---
 
+## [v1.3.3] - 2026-11-19 (Evolution X Video Preview Freeze Fix, HAL Tag Guard & Codec2 Clamping)
+
+### 🐛 Critical Bug Fixes & Video Subsystem Stability (Issue #9)
+* **Video & Pro Video Viewfinder Preview Freezing Fix (Evolution X / ruby)**:
+  * Resolved critical bug where opening Video (mode 162) or Pro Video (mode 180) resulted in a frozen/blurred viewfinder preview frame when CameraTools features (4K60, Bitrate, MiMovie) were active.
+  * **StreamConfigurationMap Viewfinder Stream Isolation**: Discovered that prepending `3840x2160` at index 0 in `StreamConfigurationMap.getOutputSizes` for `SurfaceTexture.class` and format `34` (`PRIVATE`) caused `VideoModule.updatePreviewSize` to assign 4K to the viewfinder preview surface. The MediaTek Dimensity 1080 (MT6877) ISP cannot deliver a 4K preview stream to `SurfaceTexture`, causing the preview buffer queue to stall. 4K injection is now strictly restricted to video recording targets (`MediaRecorder.class` and `MediaCodec.class`) and appended to the end of resolution arrays, preserving native preview surface formats.
+  * **MediaTek HAL Qualcomm Vendor Tag Suppression**: Hooking `isSupportedCinematicVideo` to `true` caused `MiCamera2.applyConfigurationParam` to invoke `CaptureRequestBuilder.applyCinematicVideo`, injecting Qualcomm-specific `CaptureRequestVendorTags.CINEMATIC_VIDEO_ENABLED` into repeating preview requests. On MediaTek MT6877, this unsupported vendor tag causes HAL preview stall. Implemented capability guard via `caps.isTagDefined("xiaomi.video.cinematic")` and removed blind cinematic video hooks, preserving the 2.39:1 movie frame toggle via `isSupportedVideoMiMovie`.
+  * **MT6877 Codec2 Hardware Bitrate Clamping**: Clamped `MediaRecorder.setVideoEncodingBitRate` and GCam `MediaFormat` bitrates to the MT6877 hardware encoder ceiling of 100 Mbps (per `c2.mtk.hevc.encoder` media profiles), preventing encoder buffer overrun.
+  * **XSharedPreferences Prioritization & Notice Silencing**: Prioritized LSPosed `xsp` in `reloadAllPreferences()`, falling back to local XML storage only when uninitialized and silencing benign ContentProvider notices in LSPosed logs.
+
+---
+
 ## [v1.3.2] - 2026-10-25 (AOSP Crash Fix, Leica True Tuning & Feature Polish)
 
 ### 🐛 Critical Bug Fixes & System Stability
